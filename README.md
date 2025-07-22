@@ -5,7 +5,7 @@ python .\1A\src\extractor.py --input .\1A\dataset\<pdf file>.pdf --output .\1A\o
 
 ---
 
-#Second Commit(akshaj)
+# Second Commit(akshaj)
 ## How to Run
 
 This project uses a Python script to extract a structured outline from a PDF file.
