@@ -36,7 +36,7 @@ This project uses a Python script to extract a structured outline from a PDF fil
     To process a PDF and generate the final structured outline, run the following command from the project's root directory.
 
     ```bash
-    python 1A/src/extractor.py --input 1A/dataset/pdf1.pdf --output 1A/output/final_outline.json
+    python 1A/src/extractor.py --input 1A/dataset/pdfname.pdf --output 1A/output/final_outline.json
     ```
-    This will read the input PDF and create the `final_outline.json` file in the output folder.
+    This will read the input PDF i.e. pdfname.pdf from the destination and create the `final_outline.json` file in the output folder.
     ---
