@@ -1,140 +1,25 @@
 {
-  "title": "TI - SDE Intern JD Template - Google Docs",
+  "title": "Parsippany -Troy Hills STEM Pathways",
   "outline": [
     {
-      "level": "H1",
-      "text": "Every Intern’s Role @Trilogy Innovations",
+      "level": "H3",
+      "text": "Mission Statement:",
       "page": 1
     },
     {
-      "level": "H1",
-      "text": "The Elite Force of Innovators",
+      "level": "H3",
+      "text": "Goals:",
       "page": 1
     },
     {
       "level": "H2",
-      "text": "Your Journey Begins at jTU – The Engineering Bootcamp.",
-      "page": 2
+      "text": "PATHWAY OPTIONS",
+      "page": 1
     },
     {
-      "level": "H3",
-      "text": "At jTU, you don’t just train—you evolve.",
-      "page": 2
-    },
-    {
-      "level": "H1",
-      "text": "jTU Special? What Makes",
-      "page": 2
-    },
-    {
-      "level": "H1",
-      "text": "Must have Skills",
-      "page": 2
-    },
-    {
-      "level": "H1",
-      "text": "Responsibilities Key",
-      "page": 3
-    },
-    {
-      "level": "H1",
-      "text": "Your Time at jTU",
-      "page": 3
-    },
-    {
-      "level": "H1",
-      "text": "This Internship is for You if:",
-      "page": 3
-    },
-    {
-      "level": "H3",
-      "text": "● You can learn a new technology every day and applyit effectively.",
-      "page": 3
-    },
-    {
-      "level": "H3",
-      "text": "● You can think beyond coding to solve real-world problems with a product-driven",
-      "page": 3
-    },
-    {
-      "level": "H3",
-      "text": "mindset.",
-      "page": 3
-    },
-    {
-      "level": "H3",
-      "text": "● You take ownership of your work and thrive in a fast-pacedenvironment.",
-      "page": 3
-    },
-    {
-      "level": "H3",
-      "text": "● You enjoy collaborating with teams , exchanging ideas,and pushing boundaries.",
-      "page": 3
-    },
-    {
-      "level": "H3",
-      "text": "● You don’t just complete coursework—you build projectsthat matter .",
-      "page": 3
-    },
-    {
-      "level": "H3",
-      "text": "● You have built projects beyond college coursework, especially if people use them. We",
-      "page": 3
-    },
-    {
-      "level": "H3",
-      "text": "value engineers who don’t just code for assignments but solve real-world problems",
-      "page": 3
-    },
-    {
-      "level": "H3",
-      "text": "through side projects.",
-      "page": 3
-    },
-    {
-      "level": "H3",
-      "text": "● You solve problems faster by leveraging existing libraries and frameworks rather than",
-      "page": 3
-    },
-    {
-      "level": "H3",
-      "text": "reinventing basic algorithms.",
-      "page": 3
-    },
-    {
-      "level": "H1",
-      "text": "Explore Real-World Challenges",
-      "page": 4
-    },
-    {
-      "level": "H3",
-      "text": "Explore Real-World Challenges",
-      "page": 4
-    },
-    {
-      "level": "H3",
-      "text": "At Trilogy Innovations, we focus on solving impactful engineering problems efficiently and",
-      "page": 4
-    },
-    {
-      "level": "H3",
-      "text": "innovatively.ExploreourTrilogyInnovationsAppStoreandgetaglimpseofthekindofwork",
-      "page": 4
-    },
-    {
-      "level": "H3",
-      "text": "we do.",
-      "page": 4
-    },
-    {
-      "level": "H3",
-      "text": "🔗 Check it out here: TI App Store",
-      "page": 4
-    },
-    {
-      "level": "H3",
-      "text": "This will give you firsthand exposure to the scale and complexity of the solutions we build.",
-      "page": 4
+      "level": "H2",
+      "text": "REGULAR PATHWAY DISTINCTION PATHWAY",
+      "page": 1
     }
   ]
 }
