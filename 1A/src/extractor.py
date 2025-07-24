@@ -3,198 +3,224 @@ import argparse
 import json
 import re
 from collections import Counter
+import numpy as np
+from scipy import sparse
+from sklearn.cluster import AgglomerativeClustering
+from pathlib import Path
 
-# (Your friend's excellent data extraction functions - no changes needed)
-def extract_blocks(pdf_path):
-    pdf = fitz.open(pdf_path)
+# --- Data Extraction & Grouping ---
+def extract_spans(pdf_path):
+    """Extracts and cleans all text spans from the PDF."""
+    doc = fitz.open(pdf_path)
     all_spans = []
-    for page_num, page in enumerate(pdf, start=1):
-        text_dict = page.get_text("dict")
-        page_spans = []
+    for page_num, page in enumerate(doc, start=1):
+        try:
+            text_dict = json.loads(page.get_text("json"))
+            print(f"Page {page_num} block types:", set(block.get("type") for block in text_dict.get("blocks", [])))
+        except json.JSONDecodeError:
+            continue
+        
         for block in text_dict.get("blocks", []):
+            if block.get("type") != 0:
+                continue
+
+            # 💡 Detect if it's table-like
+            lines = block.get("lines", [])
+            if len(lines) >= 2:
+                spans_per_line = [len(line.get("spans", [])) for line in lines]
+                if all(count >= 3 for count in spans_per_line):  # heuristic: 3+ spans per line
+                    continue
+
             for line in block.get("lines", []):
                 for span in line.get("spans", []):
+                    
                     text = span.get("text", '').strip()
-                    text = re.sub(r'[\x00-\x1F\x7F-\x9F\u200d\u200c\u200b\u202a-\u202e]', '', text)
+                    text = re.sub(r'[\x00-\x1F\x7F-\x9F]', '', text)
                     if not text:
                         continue
                     
-                    is_bold = "bold" in span.get("font", "").lower()
+                    font_name = span.get("font", "").lower()
+                    is_bold = 'bold' in font_name or bool(span.get("flags", 0) & 2)
                     
-                    page_spans.append({
-                        "page": page_num,
-                        "text": text,
-                        "font_size": round(span.get("size"), 2),
-                        "is_bold": is_bold,
-                        "bbox": span.get("bbox"),
-                        "y0": span.get("bbox")[1]
+                    all_spans.append({
+                        'page': page_num, 'text': text, 'font_size': round(span.get("size"), 2),
+                        'is_bold': is_bold, 'bbox': span.get("bbox"), 'y0': span.get("bbox")[1]
                     })
-        page_spans.sort(key=lambda s: s["y0"])
-        all_spans.extend(page_spans)
-    pdf.close()
+    doc.close()
     return all_spans
 
-def compute_vertical_gaps(spans):
-    new_spans = []
-    last_y0 = None
-    last_page = None
-    for span in spans:
-        page = span["page"]
-        y0 = span["y0"]
-        gap = y0 - last_y0 if last_page == page and last_y0 is not None else 0
-        new_span = span.copy()
-        new_span["gap_above"] = round(gap, 2)
-        new_spans.append(new_span)
-        last_y0 = y0
-        last_page = page
-    return new_spans
-
-# --- NEW LOGIC STARTS HERE ---
-
 def group_spans_into_lines(spans):
-    """Groups text spans into lines based on their vertical position."""
+    """Groups text spans into consolidated lines."""
+    if not spans: return []
+    spans.sort(key=lambda s: (s['page'], s['y0']))
+    
     lines = []
-    if not spans:
-        return lines
-
-    current_line_spans = [spans[0]]
-    for i in range(1, len(spans)):
-        current_span = spans[i]
-        prev_span = current_line_spans[-1]
-        
-        # Check if spans are on the same page and are vertically aligned (within a small tolerance)
-        if current_span["page"] == prev_span["page"] and abs(current_span["y0"] - prev_span["y0"]) < 2:
-            current_line_spans.append(current_span)
+    current_line = [spans[0]]
+    for span in spans[1:]:
+        if span['page'] == current_line[-1]['page'] and abs(span['y0'] - current_line[-1]['y0']) < 2:
+            current_line.append(span)
         else:
-            lines.append(current_line_spans)
-            current_line_spans = [current_span]
-    lines.append(current_line_spans)
+            lines.append(current_line)
+            current_line = [span]
+    lines.append(current_line)
 
-    # Consolidate grouped spans into single line objects
-    consolidated_lines = []
-    for line_spans in lines:
-        full_text = " ".join(s["text"] for s in line_spans)
-        # Use properties of the first span as representative for the line
-        first_span = line_spans[0]
-        consolidated_lines.append({
-            "text": full_text,
-            "page": first_span["page"],
-            "font_size": first_span["font_size"],
-            "is_bold": first_span["is_bold"],
-            "y0": first_span["y0"],
-            "gap_above": first_span["gap_above"]
-        })
-    return consolidated_lines
-
-def classify_headings(lines):
-    """Scores and classifies lines to identify headings."""
-    if not lines:
-        return [], None
-
-    # Step 1: Find the most common font size to identify body text
-    font_sizes = [line['font_size'] for line in lines if line['text']]
-    if not font_sizes:
-        return [], None
-    body_text_size = Counter(font_sizes).most_common(1)[0][0]
-
-    # Step 2: Score each line to determine if it's a heading candidate
-    headings = []
-    for line in lines:
-        score = 0
-        # Score based on font size (larger than body text is a strong indicator)
-        if line["font_size"] > body_text_size:
-            score += (line["font_size"] - body_text_size) * 2
-
-        # Score for being bold
-        if line["is_bold"]:
-            score += 5
-
-        # Score for having significant space above it
-        if line["gap_above"] > 10:  # 10 is a heuristic, might need tuning
-            score += 5
-
-        # Lines that start with numbers (e.g., "1. Introduction") are likely headings
-        if re.match(r'^\d+(\.\d+)*\s', line['text']):
-            score += 10
-
-        # If the score is high enough, consider it a heading
-        if score > 5:
-            headings.append({
-                "text": line["text"],
-                "page": line["page"],
-                "font_size": line["font_size"],
-                "score": score
-            })
-    
-    return headings, body_text_size
-
-
-def generate_final_json(pdf_path, headings):
-    """Formats the classified headings into the required final JSON structure."""
-    if not headings:
-        return {"title": "Unknown", "outline": []}
-
-    # Step 1: Identify the document title
-    doc = fitz.open(pdf_path)
-    title = doc.metadata.get('title', '').strip()
-    doc.close()
-    
-    # If metadata title is missing or generic, use the highest-scored heading on page 1
-    if not title or len(title) < 4:
-        page1_headings = [h for h in headings if h["page"] == 1]
-        if page1_headings:
-            title = max(page1_headings, key=lambda x: x['score'])['text']
-        else: # Fallback if no headings on page 1
-             title = max(headings, key=lambda x: x['score'])['text']
-
-
-    # Step 2: Determine H1, H2, H3 based on font sizes
-    heading_font_sizes = sorted(list(set(h['font_size'] for h in headings)), reverse=True)
-    
-    size_to_level = {}
-    if len(heading_font_sizes) > 0:
-        size_to_level[heading_font_sizes[0]] = "H1"
-    if len(heading_font_sizes) > 1:
-        size_to_level[heading_font_sizes[1]] = "H2"
-    if len(heading_font_sizes) > 2:
-        size_to_level[heading_font_sizes[2]] = "H3"
+    consolidated = []
+    last_y0, last_page = None, None
+    for group in lines:
+        page = group[0]['page']
+        y0 = group[0]['y0']
+        gap = y0 - last_y0 if last_page == page and last_y0 is not None else 0
         
-    # Step 3: Build the final outline
-    outline = []
-    for heading in headings:
-        # Exclude the title from the outline if it's found there
-        if heading['text'].lower() == title.lower():
+        consolidated.append({
+            'page': page,
+            'text': ' '.join(s['text'] for s in group),
+            'font_size': round(sum(s['font_size'] for s in group) / len(group), 2),
+            'is_bold': any(s['is_bold'] for s in group),
+            'y0': y0,
+            'gap_above': round(gap, 2)
+        })
+        last_y0, last_page = y0, page
+    return consolidated
+
+# --- Tier 1: Explicit Structure Extraction -
+
+# --- Tier 2: Heuristic Engine ---
+def score_and_classify(lines):
+    """Identifies heading candidates using a rule-based scoring system."""
+    if not lines: return []
+    sizes = [L['font_size'] for L in lines]
+    body_size = Counter(sizes).most_common(1)[0][0]
+    
+    candidates = []
+    for L in lines:
+        text = L['text']
+        # High-confidence rule for numbered headings
+        match = re.match(r'^(\d+(?:\.\d+)*)\s', text)
+        if match:
+            depth = match.group(1).count('.') + 1
+            candidates.append({
+                'text': text, 'page': L['page'], 'font_size': L['font_size'],
+                'score': float('inf'), 'explicit_level': f'H{min(depth, 3)}'
+            })
+            continue
+
+        if re.search(r'\.{5,}', text) or len(text) < 3:
             continue
             
-        font_size = heading['font_size']
-        if font_size in size_to_level:
-            outline.append({
-                "level": size_to_level[font_size],
-                "text": heading['text'],
-                "page": heading['page']
+        score = 0
+        if L['font_size'] > body_size: score += (L['font_size'] - body_size) * 2
+        if L['is_bold']: score += 5
+        if L['gap_above'] > 12: score += 5
+        
+        if score > 5:
+            candidates.append({
+                'text': text, 'page': L['page'], 'font_size': L['font_size'], 'score': round(score, 2)
             })
+    return candidates
 
-    return {"title": title, "outline": outline}
-
-
-def main(input_pdf, output_json):
-    # The main pipeline orchestrating all steps
-    spans = extract_blocks(input_pdf)
-    spans_with_gaps = compute_vertical_gaps(spans)
-    lines = group_spans_into_lines(spans_with_gaps)
-    headings, _ = classify_headings(lines)
-    final_output = generate_final_json(input_pdf, headings)
-
-    # saving the final structured JSON
-    with open(output_json, 'w', encoding='utf-8') as file:
-        json.dump(final_output, file, ensure_ascii=False, indent=2)
+def cluster_pages_and_build_outline(headings, lines):
+    """Clusters pages by layout and determines heading levels by section."""
+    if not headings: return []
     
-    print(f"Successfully created outline for {input_pdf} at {output_json}")
+    pages = sorted({L['page'] for L in lines})
+    n_pages = len(pages)
+    if n_pages <= 1: # No need to cluster a single page
+        page_segments = [pages]
+    else:
+        # Create page "fingerprints" based on layout
+        all_sizes = [L['font_size'] for L in lines]
+        top_sizes = sorted(set(all_sizes), reverse=True)[:5]
+        size_to_idx = {s: i for i, s in enumerate(top_sizes)}
+        page_to_index = {p: i for i, p in enumerate(pages)}
+        
+        X = np.zeros((n_pages, len(top_sizes) + 2))
+        stats = {p: {'counts': Counter(), 'total': 0, 'bold': 0} for p in pages}
 
+        for L in lines:
+            p_stats = stats[L['page']]
+            p_stats['counts'][L['font_size']] += 1
+            p_stats['total'] += 1
+            p_stats['bold'] += int(L['is_bold'])
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Extract a structured outline from a PDF.")
-    parser.add_argument("--input", required=True, help="Input PDF file path")
-    parser.add_argument("--output", required=True, help="Output JSON file path")
+        for p, st in stats.items():
+            i = page_to_index[p]
+            total = st['total'] or 1
+            for s, cnt in st['counts'].items():
+                if s in size_to_idx:
+                    X[i, size_to_idx[s]] = cnt / total
+            X[i, len(top_sizes)] = st['bold'] / total
+        
+        # Build connectivity matrix to only allow adjacent pages to cluster
+        conn = sparse.lil_matrix((n_pages, n_pages))
+        for i in range(n_pages - 1):
+            conn[i, i + 1] = 1
+            conn[i + 1, i] = 1
+        
+        model = AgglomerativeClustering(
+            n_clusters=None, metric='euclidean', linkage='average',
+            distance_threshold=0.5, # This is the main tunable parameter
+            connectivity=conn.tocsr()
+        )
+        labels = model.fit_predict(X)
+        
+        seg_dict = {}
+        for p, lbl in zip(pages, labels):
+            seg_dict.setdefault(lbl, []).append(p)
+        page_segments = [sorted(seg_dict[lbl]) for lbl in sorted(seg_dict)]
+
+    # Determine H1/H2/H3 levels for each segment
+    outline = []
+    headings_by_page = {p: [] for p in pages}
+    for h in headings:
+        headings_by_page.get(h['page'], []).append(h)
+
+    for seg in page_segments:
+        seg_sizes = sorted({h['font_size'] for p in seg for h in headings_by_page.get(p, [])}, reverse=True)
+        level_map = {size: f'H{i+1}' for i, size in enumerate(seg_sizes[:3])}
+        
+        for p in seg:
+            for h in headings_by_page.get(p, []):
+                lvl = h.get('explicit_level') or level_map.get(h['font_size'])
+                if lvl:
+                    outline.append({'level': lvl, 'text': h['text'], 'page': p})
+    return outline
+
+def get_final_outline(pdf_path):
+    """Main function to orchestrate the entire extraction process."""
+    # --- Step 1: Extract all line data from the PDF ---
+    spans = extract_spans(pdf_path)
+    lines = group_spans_into_lines(spans)
+
+    # --- Step 2: Determine the Document Title Visually ---
+    # We find the title based on the text from page 1, regardless of other methods.
+    title = Path(pdf_path).stem # Default title is the filename
+    page1_lines = [h for h in lines if h['page'] == 1]
+    if page1_lines:
+        # The title is likely the text with the largest font size on the first page.
+        # We check the top few lines to be safe.
+        top_lines = sorted(page1_lines, key=lambda x: x['y0'])[:5]
+        if top_lines:
+            title = max(top_lines, key=lambda x: x['font_size'])['text']
+
+    # --- Step 4: If no TOC, run the Heuristic Engine ---
+    headings = score_and_classify(lines)
+    
+    # Build the outline and filter out the line that we identified as the title
+    raw_outline = cluster_pages_and_build_outline(headings, lines)
+    filtered = [o for o in raw_outline if o['text'].strip().lower() != title.strip().lower()]
+    sorted_outline = sorted(filtered, key=lambda o: (o['page'], o['text']))
+
+    return {'title': title, 'outline': sorted_outline}
+
+# --- Main Execution ---
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Extract a structured outline from a PDF.')
+    parser.add_argument('--input', required=True, help='Path to input PDF')
+    parser.add_argument('--output', required=True, help='Path to output JSON')
     args = parser.parse_args()
-    main(args.input, args.output)
+    
+    result = get_final_outline(args.input)
+    
+    with open(args.output, 'w', encoding='utf-8') as f:
+        json.dump(result, f, ensure_ascii=False, indent=4)
+    print(f'Successfully wrote outline to {args.output}')
