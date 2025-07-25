@@ -106,6 +106,15 @@ def extract_and_group_lines(pdf_path):
             })
 
     doc.close()
+
+    page_maxY = {}
+    for line in all_lines:                                  # mark last lines
+        p, y0 = line["page"], line["y0"]
+        page_maxY[p] = max(page_maxY.get(p, y0), y0)
+
+    for line in all_lines:                                  # add is_last_line feature
+        line["is_last_line"] = (line["y0"] == page_maxY[line["page"]])
+
     return all_lines
 
 # --- Classify Headings ---
@@ -120,7 +129,7 @@ def classify_heading_candidates(lines):
     candidates = []
 
     for line in lines:
-        if line["in_table"]:
+        if line["in_table"] or line["is_last_line"]:        # skip table lines and last lines of page
             continue
         features = {
             'font_size_diff': line["font_size"] - body_size,
