@@ -158,7 +158,7 @@ def cluster_pages_and_build_outline(headings, lines):
                 X[i, size_to_idx[size]] = count / total
         X[i, len(top_sizes)] = s['bold'] / total
 
-    # 🛑 Bypass clustering if only 1 page
+    # Bypass clustering if only 1 page
     if n_pages == 1:
         seg_dict = {0: [pages[0]]}
     else:
@@ -239,4 +239,4 @@ if __name__ == '__main__':
     with open(args.output, 'w', encoding='utf-8') as f:
         json.dump(result, f, indent=4, ensure_ascii=False)
 
-    print(f"✅ Extracted outline written to {args.output}")
+    print(f"Extracted outline written to {args.output}")
