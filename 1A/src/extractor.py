@@ -19,6 +19,16 @@ WEIGHTS = {
 }
 INTERCEPT = 1.6011
 
+# WEIGHTS = {
+#     'font_size_diff': 0.5019,
+#     'is_bold': 3.0546,
+#     'gap_above': 0.0016,
+#     'word_count': -0.4218,
+#     'ends_in_period': -2.7970,
+#     'is_short_line': -1.4046,
+# }
+# INTERCEPT = 1.7762
+
 # --- Helper: Normalize text ---
 def _clean_text(text):
     cleaned = re.sub(r'[^a-z0-9\s]', '', text.lower())
@@ -205,6 +215,11 @@ def cluster_pages_and_build_outline(headings, lines):
 
 # --- Final Output ---
 def get_final_outline(pdf_path):
+    pdf = fitz.open(pdf_path)
+    page_count = pdf.page_count
+    pdf.close()
+    page_offset = 1 if page_count > 1 else 0
+
     all_lines = extract_and_group_lines(pdf_path)
 
     # Detect Title
@@ -221,6 +236,10 @@ def get_final_outline(pdf_path):
     # Filter title out
     filtered = [o for o in outline if _clean_text(o["text"]) != _clean_text(title)]
     sorted_outline = sorted(filtered, key=lambda x: x["page"])
+
+    # taking care of page indexing
+    for o in sorted_outline:
+        o['page'] = o['page'] - page_offset
 
     return {
         "title": title,
