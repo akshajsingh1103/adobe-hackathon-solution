@@ -6,6 +6,13 @@ import pandas as pd
 import os
 from sklearn.linear_model import LogisticRegression
 
+def _clean_text(text):
+    """Normalizes text for robust comparison."""
+    # Convert to lowercase and remove all non-alphanumeric characters
+    cleaned = re.sub(r'[^a-z0-9\s]', '', text.lower())
+    # Consolidate multiple spaces into one
+    return re.sub(r'\s+', ' ', cleaned).strip()
+
 # (Helper functions: extract_blocks, compute_vertical_gaps, group_spans_into_lines)
 def extract_blocks(pdf_path):
     pdf = fitz.open(pdf_path)
@@ -78,13 +85,17 @@ def group_spans_into_lines(spans):
         })
     return consolidated_lines
 
+# In train.py, replace the old function with this one:
+
 def create_training_data(pdf_path, ground_truth_json_path):
+    """Creates a labeled dataset for training our model with robust, fuzzy matching."""
     print(f"Processing {os.path.basename(pdf_path)}...")
     with open(ground_truth_json_path, 'r', encoding='utf-8') as f:
         ground_truth = json.load(f)
     
-    true_headings = set(item['text'].strip() for item in ground_truth.get('outline', []))
-    true_title = ground_truth.get('title', '').strip()
+    # Clean the ground truth text once using our new helper
+    true_headings = {_clean_text(item['text']) for item in ground_truth.get('outline', [])}
+    true_title = _clean_text(ground_truth.get('title', ''))
     
     spans = extract_blocks(pdf_path)
     spans_with_gaps = compute_vertical_gaps(spans)
@@ -96,15 +107,18 @@ def create_training_data(pdf_path, ground_truth_json_path):
     
     data = []
     for line in all_lines:
-        text = line['text'].strip()
-        is_heading = 1 if (text in true_headings or text == true_title) else 0
+        # Clean the extracted text from the PDF in the same way
+        cleaned_text = _clean_text(line['text'])
+        
+        # Now, the comparison is much more reliable
+        is_heading = 1 if (cleaned_text in true_headings or cleaned_text == true_title) else 0
         
         features = {
             'font_size_diff': line['font_size'] - body_text_size,
             'is_bold': int(line['is_bold']),
             'gap_above': line['gap_above'],
-            'word_count': len(text.split()),
-            'ends_in_period': int(text.endswith('.')),
+            'word_count': len(line['text'].strip().split()),
+            'ends_in_period': int(line['text'].strip().endswith('.')),
             'is_heading': is_heading
         }
         data.append(features)

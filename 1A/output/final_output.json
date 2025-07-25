@@ -7,53 +7,18 @@
             "page": 1
         },
         {
-            "level": "H2",
-            "text": "International Software Testing Qualifications Board",
-            "page": 1
-        },
-        {
             "level": "H3",
             "text": "Version 1.0",
             "page": 1
         },
         {
             "level": "H2",
-            "text": "0.1 18 JUNE 2013 Initial version",
-            "page": 3
-        },
-        {
-            "level": "H2",
-            "text": "0.2 23 JULY 2013 WG reviewed and confirmed",
-            "page": 3
-        },
-        {
-            "level": "H2",
-            "text": "0.3 6 NOV 2013 amended population and diagram",
-            "page": 3
-        },
-        {
-            "level": "H2",
-            "text": "0.7 11 DEC 2013 Amended Business Outcomes and Chapters matching",
-            "page": 3
-        },
-        {
-            "level": "H2",
-            "text": "0.8 20 DEC 2013 Working group updates on 0.7",
-            "page": 3
-        },
-        {
-            "level": "H2",
-            "text": "1.0 31 MAY 2014 GA release for Agile Extension",
-            "page": 3
+            "text": "International Software Testing Qualifications Board",
+            "page": 1
         },
         {
             "level": "H1",
             "text": "Revision History",
-            "page": 3
-        },
-        {
-            "level": "H3",
-            "text": "Version Date Remarks",
             "page": 3
         },
         {
@@ -102,11 +67,6 @@
             "page": 8
         },
         {
-            "level": "H3",
-            "text": "Syllabus Days",
-            "page": 8
-        },
-        {
             "level": "H2",
             "text": "2.6 Keeping It Current",
             "page": 9
@@ -117,6 +77,11 @@
             "page": 10
         },
         {
+            "level": "H1",
+            "text": "Syllabus",
+            "page": 10
+        },
+        {
             "level": "H2",
             "text": "3.1 Business Outcomes",
             "page": 10
@@ -124,11 +89,6 @@
         {
             "level": "H2",
             "text": "3.2 Content",
-            "page": 10
-        },
-        {
-            "level": "H1",
-            "text": "Syllabus",
             "page": 10
         },
         {
@@ -144,11 +104,6 @@
         {
             "level": "H2",
             "text": "4.2 Documents and Web Sites",
-            "page": 12
-        },
-        {
-            "level": "H3",
-            "text": "Identifier Reference",
             "page": 12
         }
     ]
