@@ -44,7 +44,8 @@ def extract_and_group_lines(pdf_path):
             blocks = page.get_text("dict").get("blocks", [])
             tables = page.find_tables().tables
             table_areas = [t.bbox for t in tables]
-        except Exception:
+        except Exception as e:
+            print(f"Skipping page {page_num+1} due to MuPDF error: {e}")
             continue
 
         spans = []
@@ -130,6 +131,8 @@ def classify_heading_candidates(lines):
 
     for line in lines:
         if line["in_table"] or line["is_last_line"]:        # skip table lines and last lines of page
+            continue
+        if line['y0'] > 600:                                # skip footers
             continue
         features = {
             'font_size_diff': line["font_size"] - body_size,
