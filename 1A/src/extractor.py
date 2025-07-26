@@ -236,11 +236,12 @@ def get_final_outline(pdf_path):
 
     # Detect Title
     page1_lines = [l for l in all_lines if l["page"] == 1 and not l["in_table"]]
-    title = Path(pdf_path).stem
+    title = ""
     if page1_lines:
-        top_lines = sorted(page1_lines, key=lambda x: x["y0"])[:5]
-        if top_lines:
-            title = max(top_lines, key=lambda x: x["font_size"])["text"]
+        # title is line with greatest font size. if tie, then upper line
+        best_fit_for_title = max(page1_lines, key = lambda L: (L["font_size"], -L["y0"]))
+        if best_fit_for_title["y0"] < 550:
+            title = best_fit_for_title["text"]
 
     headings = classify_heading_candidates(all_lines)
     outline = cluster_pages_and_build_outline(headings, all_lines)
