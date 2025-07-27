@@ -36,7 +36,8 @@ def _clean_text(text):
 
 def is_noise_line(text):
     # Line is mostly punctuation or contains long stretches of dots
-    return bool(re.match(r"^\.{5,}$", text.strip())) or len(re.sub(r"[.\s]", "", text)) < 5
+    return bool(re.match(r"^[. \t]{5,}.*\d{1,3}$", text.strip())) or \
+           bool(re.match(r"^.*\.{5,}.*\d{1,3}$", text.strip()))
 
 # --- Main extraction: line-wise grouping with table detection ---
 def extract_and_group_lines(pdf_path):
@@ -159,13 +160,13 @@ def extract_and_group_lines(pdf_path):
             #     i += 1
             #     continue
 
-            # if is_noise_line(current['text']):
-            #     i += 1
-            #     continue
+            if is_noise_line(current['text']):
+                i += 1
+                continue
             
             combined = current.copy()
 
-            print(combined['text'])
+            # print(combined['text'])
 
             j = i + 1
             while j < len(all_lines):
@@ -174,9 +175,9 @@ def extract_and_group_lines(pdf_path):
                 #     j+=1
                 #     continue
 
-                # if is_noise_line(next_line['text']):
-                #     j += 1
-                #     continue
+                if is_noise_line(next_line['text']):
+                    j += 1
+                    continue
 
                 gap = next_line['y0'] - current['y0']
                 same_page = current['page'] == next_line['page']
