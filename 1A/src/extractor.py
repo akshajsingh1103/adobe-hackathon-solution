@@ -112,13 +112,42 @@ def extract_and_group_lines(pdf_path):
 
     doc.close()
 
-    page_maxY = {}
-    for line in all_lines:                                  # mark last lines
-        p, y0 = line["page"], line["y0"]
-        page_maxY[p] = max(page_maxY.get(p, y0), y0)
+    # page_maxY = {}
+    # for line in all_lines:                                  # mark last lines
+    #     p, y0 = line["page"], line["y0"]
+    #     page_maxY[p] = max(page_maxY.get(p, y0), y0)
 
-    for line in all_lines:                                  # add is_last_line feature
-        line["is_last_line"] = (line["y0"] == page_maxY[line["page"]])
+    # for line in all_lines:                                  # add is_last_line feature
+    #     line["is_last_line"] = (line["y0"] == page_maxY[line["page"]])
+
+    # --- Smart header/footer removal based on text frequency, only if >=2 pages ---
+    pages = {l["page"] for l in all_lines}
+    if len(pages) > 2:
+        # 1) Count how often each exact line text appears (excluding page 1)
+        text_freq = Counter()
+        page_of_text = defaultdict(set)
+        for l in all_lines:
+            if l["page"] == 1:
+                continue
+            t = l["text"].strip()
+            if t:
+                text_freq[t] += 1
+                page_of_text[t].add(l["page"])
+
+        # 2) Identify “repeated” texts appearing on ≥50% of pages (page 2+)
+        num_pages = max(pages)
+        threshold = max(2, int((num_pages - 1) * 0.5))  # at least 2 occurrences
+        repeated = {t for t, cnt in text_freq.items() if cnt >= threshold}
+
+        # 3) Filter out only those lines whose text is in `repeated`
+        cleaned = []
+        for l in all_lines:
+            if l["page"] == 1 or l["text"].strip() not in repeated:
+                cleaned.append(l)
+        all_lines = cleaned
+    # else: single‐page PDF → skip filtering
+
+
 
     # --- Merge multiple lines that likely belong to same visual heading ---
     if 1:
@@ -126,13 +155,13 @@ def extract_and_group_lines(pdf_path):
         i = 0
         while i < len(all_lines):
             current = all_lines[i]
-            if current['y0'] < 100 and current['page'] > 1:
-                i += 1
-                continue
+            # if current['y0'] < 100 and current['page'] > 1:
+            #     i += 1
+            #     continue
 
-            if is_noise_line(current['text']):
-                i += 1
-                continue
+            # if is_noise_line(current['text']):
+            #     i += 1
+            #     continue
             
             combined = current.copy()
 
@@ -141,13 +170,13 @@ def extract_and_group_lines(pdf_path):
             j = i + 1
             while j < len(all_lines):
                 next_line = all_lines[j]
-                if (next_line['y0']<100 and next_line['page']>1):
-                    j+=1
-                    continue
+                # if (next_line['y0']<100 and next_line['page']>1):
+                #     j+=1
+                #     continue
 
-                if is_noise_line(next_line['text']):
-                    j += 1
-                    continue
+                # if is_noise_line(next_line['text']):
+                #     j += 1
+                #     continue
 
                 gap = next_line['y0'] - current['y0']
                 same_page = current['page'] == next_line['page']
@@ -163,7 +192,8 @@ def extract_and_group_lines(pdf_path):
                     same_page and
                     similar_size and
                     same_bold and
-                    0 < gap < max_gap
+                    0 < gap < max_gap and
+                    current["in_table"]==next_line["in_table"]
                 )
 
 
@@ -175,7 +205,6 @@ def extract_and_group_lines(pdf_path):
                 combined['ends_in_period'] = int(next_line['text'].strip().endswith("."))
                 combined['is_short_line'] = int(combined['word_count'] <= 2)
                 combined['in_table'] = combined['in_table'] or next_line['in_table']
-                combined['is_last_line'] = next_line['is_last_line']
                 current = next_line
                 j += 1
             # print(combined['text'])
@@ -197,10 +226,10 @@ def classify_heading_candidates(lines):
     candidates = []
 
     for line in lines:
-        if line["in_table"] or line["is_last_line"]:        # skip table lines and last lines of page
+        if line["in_table"]:        # skip table lines and last lines of page
             continue
-        if line['y0'] > 600:                                # skip footers
-            continue
+        # if line['y0'] > 615:                                # skip footers
+        #     continue
         features = {
             'font_size_diff': line["font_size"] - body_size,
             'is_bold': int(line["is_bold"]),
