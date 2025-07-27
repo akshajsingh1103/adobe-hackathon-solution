@@ -229,8 +229,8 @@ def classify_heading_candidates(lines):
     for line in lines:
         if line["in_table"]:        # skip table lines and last lines of page
             continue
-        # if line['y0'] > 615:                                # skip footers
-        #     continue
+        if line['y0'] > 615:                                # skip footers
+            continue
         features = {
             'font_size_diff': line["font_size"] - body_size,
             'is_bold': int(line["is_bold"]),
