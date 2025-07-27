@@ -150,6 +150,10 @@ def classify_heading_candidates(lines):
                 "font_size": line["font_size"],
                 "score": score
             })
+    print("\n=== Detected Heading Candidates ===")
+    for c in candidates:
+        print(f"Page {c['page']} | Size: {c['font_size']} | Score: {round(c['score'], 2)} | Text: {c['text']}")
+
     return candidates
 
 # --- Cluster and Assign H1/H2/H3 ---
@@ -222,6 +226,7 @@ def cluster_pages_and_build_outline(headings, lines):
                         "page": h["page"],
                         "score": h["score"]
                     })
+                  
     return outline
 
 

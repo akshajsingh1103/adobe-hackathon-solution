@@ -1,0 +1,79 @@
+{
+    "metadata": {
+        "input_documents": [
+            "South of France - Cities.pdf",
+            "South of France - Cuisine.pdf",
+            "South of France - History.pdf",
+            "South of France - Restaurants and Hotels.pdf",
+            "South of France - Things to Do.pdf",
+            "South of France - Tips and Tricks.pdf",
+            "South of France - Traditions and Culture.pdf"
+        ],
+        "persona": {
+            "role": "Travel Planner"
+        },
+        "job_to_be_done": {
+            "task": "Plan a trip of 4 days for a group of 10 college friends."
+        },
+        "processing_timestamp": "2025-07-27T09:25:34.831723"
+    },
+    "extracted_sections": [
+        {
+            "document": "South of France - Tips and Tricks.pdf",
+            "page_number": 8,
+            "section_title": "Conclusion",
+            "importance_rank": 1
+        },
+        {
+            "document": "South of France - Tips and Tricks.pdf",
+            "page_number": 1,
+            "section_title": "General Packing Tips and Tricks",
+            "importance_rank": 2
+        },
+        {
+            "document": "South of France - Tips and Tricks.pdf",
+            "page_number": 2,
+            "section_title": "Winter (December to February)",
+            "importance_rank": 3
+        },
+        {
+            "document": "South of France - Tips and Tricks.pdf",
+            "page_number": 7,
+            "section_title": "Roll Your Clothes: Save space and reduce wrinkles. •",
+            "importance_rank": 4
+        },
+        {
+            "document": "South of France - Things to Do.pdf",
+            "page_number": 4,
+            "section_title": "Cooking Classes",
+            "importance_rank": 5
+        }
+    ],
+    "subsection_analysis": [
+        {
+            "document": "South of France - Tips and Tricks.pdf",
+            "refined_text": "Pack a Day Bag: Bring a small day bag for daily excursions. Conclusion Packing for a trip to the South of France involves considering the season, planned activities, and the needs of both adults and children. Remember to pack light, versatile clothing, and essential items to make the most of your travel experience.",
+            "page_number": 8
+        },
+        {
+            "document": "South of France - Tips and Tricks.pdf",
+            "refined_text": "The Ultimate South of France Travel Companion: Your Comprehensive Guide to Packing, Planning, and Exploring Introduction Planning a trip to the South of France requires thoughtful preparation to ensure a comfortable and enjoyable experience. This guide covers everything from packing essentials to travel tips, catering to all seasons and various activities. Whether you're traveling solo, with kids, or in a group, this guide will help you make the most of your trip.",
+            "page_number": 1
+        },
+        {
+            "document": "South of France - Tips and Tricks.pdf",
+            "refined_text": "Packing Cubes: Use packing cubes to organize your clothes and maximize suitcase • space. • Travel-Sized Toiletries: Bring travel-sized toiletries to save space and comply with • airline regulations. Portable Laundry Kit: A small laundry kit with detergent and a travel clothesline can • be handy for longer trips.",
+            "page_number": 2
+        },
+        {
+            "document": "South of France - Tips and Tricks.pdf",
+            "refined_text": "City Exploration Day Bag: A small, secure day bag for carrying essentials like water, snacks, and a • camera. Consider • using public transportation to explore cities eﬃciently. Wine Tours Comfortable Clothing: Wear comfortable, casual clothing suitable for walking and • wine tasting.",
+            "page_number": 7
+        },
+        {
+            "document": "South of France - Things to Do.pdf",
+            "refined_text": "Outdoor Activities The diverse landscapes of the South of France oﬀer plenty of opportunities for outdoor adventures: Hiking and Biking Verdon Gorge : Known as the \"Grand Canyon of Europe,\" oﬀering spectacular hiking • trails. • Gorges du Tarn : Hike through dramatic gorges and enjoy breathtaking views. • Dordogne River : Enjoy a leisurely canoe trip, passing by medieval castles and • charming villages.",
+            "page_number": 4
+        }
+    ]
+}
