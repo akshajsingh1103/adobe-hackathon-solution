@@ -5,6 +5,9 @@ import re
 import sys
 import argparse
 from sentence_transformers import SentenceTransformer, util
+import sys
+import io
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 # This tells Python to also look for files in the current script's directory (src)
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -48,7 +51,7 @@ def chunk_document_into_sections(pdf_path, title, outline, all_lines):
         print("\n--- Debug: Extracted Sections ---")
     for sec in sections:
         print(f"Section: {sec['section_title']} | Page: {sec['page_number']}")
-        print(f"  → Content Preview: {sec['content'][:200]}...\n")
+        print(f"  -> Content Preview: {sec['content'][:200]}...\n")
 
     return sections
 

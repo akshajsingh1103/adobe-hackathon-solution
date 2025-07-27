@@ -34,6 +34,10 @@ def _clean_text(text):
     cleaned = re.sub(r'[^a-z0-9\s]', '', text.lower())
     return re.sub(r'\s+', ' ', cleaned).strip()
 
+def is_noise_line(text):
+    # Line is mostly punctuation or contains long stretches of dots
+    return bool(re.match(r"^\.{5,}$", text.strip())) or len(re.sub(r"[.\s]", "", text)) < 5
+
 # --- Main extraction: line-wise grouping with table detection ---
 def extract_and_group_lines(pdf_path):
     doc = fitz.open(pdf_path)
@@ -116,6 +120,69 @@ def extract_and_group_lines(pdf_path):
     for line in all_lines:                                  # add is_last_line feature
         line["is_last_line"] = (line["y0"] == page_maxY[line["page"]])
 
+    # --- Merge multiple lines that likely belong to same visual heading ---
+    if 1:
+        merged_lines = []
+        i = 0
+        while i < len(all_lines):
+            current = all_lines[i]
+            if current['y0'] < 100 and current['page'] > 1:
+                i += 1
+                continue
+
+            if is_noise_line(current['text']):
+                i += 1
+                continue
+            
+            combined = current.copy()
+
+            print(combined['text'])
+
+            j = i + 1
+            while j < len(all_lines):
+                next_line = all_lines[j]
+                if (next_line['y0']<100 and next_line['page']>1):
+                    j+=1
+                    continue
+
+                if is_noise_line(next_line['text']):
+                    j += 1
+                    continue
+
+                gap = next_line['y0'] - current['y0']
+                same_page = current['page'] == next_line['page']
+                same_bold = current['is_bold'] == next_line['is_bold']
+                similar_size = abs(current['font_size'] - next_line['font_size']) < 0.5
+
+                # Allow wider gap if it's on the first page
+                max_gap = 60 if current['page'] == 1 else 20
+                # max_gap=20
+                # print(current['page'], current['text'], max_gap)
+
+                can_merge = (
+                    same_page and
+                    similar_size and
+                    same_bold and
+                    0 < gap < max_gap
+                )
+
+
+                if not can_merge:
+                    break
+
+                combined['text'] += ' ' + next_line['text']
+                combined['word_count'] += next_line['word_count']
+                combined['ends_in_period'] = int(next_line['text'].strip().endswith("."))
+                combined['is_short_line'] = int(combined['word_count'] <= 2)
+                combined['in_table'] = combined['in_table'] or next_line['in_table']
+                combined['is_last_line'] = next_line['is_last_line']
+                current = next_line
+                j += 1
+            # print(combined['text'])
+            merged_lines.append(combined)
+            i = j
+
+        return merged_lines
     return all_lines
 
 # --- Classify Headings ---
