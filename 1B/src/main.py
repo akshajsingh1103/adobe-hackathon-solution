@@ -4,7 +4,10 @@ import datetime
 import re
 import sys
 import argparse
+import math
 from sentence_transformers import SentenceTransformer, util
+sys.stdout = open("debug_log.txt", "w", encoding="utf-8")  # Redirects all prints
+
 
 # This tells Python to also look for files in the current script's directory (src)
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -14,12 +17,18 @@ from extractor_utils import get_final_outline
 
 def chunk_document_into_sections(pdf_path, title, outline, all_lines):
     """Groups a document's lines into sections based on the heading structure."""
+    # 1. DEBUG: Print the outline headings received
+    print("\n--- DEBUG: OUTLINE HEADINGS ---")
+    for h in outline:
+        print(f"[Page {h['page']}] y0: {h.get('y0', 0):.2f} → \"{h['text']}\"")
     if not outline:
         full_text = " ".join(line['text'] for line in all_lines)
         return [{"section_title": title, "page_number": 1, "content": full_text, "document_name": os.path.basename(pdf_path)}]
 
     sections = []
     sorted_headings = sorted(outline, key=lambda x: (x['page'], x.get('y0', 0)))
+    # 2. Build heading map for float-tolerant comparison
+    heading_y0s = {(h['page'], h['text']): h.get('y0', 0) for h in sorted_headings}
 
     for i, heading in enumerate(sorted_headings):
         section_text = []
@@ -31,12 +40,23 @@ def chunk_document_into_sections(pdf_path, title, outline, all_lines):
             next_heading = sorted_headings[i+1]
             end_page = next_heading['page']
             end_y0 = next_heading.get('y0', 0)
-
+        print(f"\n--- DEBUG: NEAR HEADING '{heading['text']}' ON PAGE {heading['page']} ---")
         for line in all_lines:
+            page = line.get('page')
+            y0 = line.get('y0', 0)
             is_after_start = line['page'] > start_page or (line['page'] == start_page and line.get('y0', 0) > start_y0)
             is_before_end = line['page'] < end_page or (line['page'] == end_page and line.get('y0', 0) < end_y0)
             
             if is_after_start and is_before_end:
+                is_heading_line = any(
+                    page == h_page and math.isclose(y0, h_y0, abs_tol=1.0)
+                    for (h_page, _), h_y0 in heading_y0s.items()
+                )
+                if is_heading_line:
+                    print(f"  [SKIP heading line at y0={y0:.2f}] {line['text']}")  # <-- ADD DEBUG HERE
+                    continue
+
+                print(f"  [ADD] y0={y0:.2f} → {line['text']}")
                 section_text.append(line['text'])
         
         sections.append({
@@ -48,7 +68,7 @@ def chunk_document_into_sections(pdf_path, title, outline, all_lines):
         print("\n--- Debug: Extracted Sections ---")
     for sec in sections:
         print(f"Section: {sec['section_title']} | Page: {sec['page_number']}")
-        print(f"  → Content Preview: {sec['content'][:200]}...\n")
+        print(f"  → Content Preview: {sec['content'][:700]}...\n")
 
     return sections
 

@@ -226,40 +226,43 @@ def cluster_pages_and_build_outline(headings, lines):
 
 
 # --- Final Output ---
+# In 1B/src/extractor_utils.py
+
+# In 1B/src/extractor_utils.py
+
 def get_final_outline(pdf_path, return_all_lines=False):
-    pdf = fitz.open(pdf_path)
-    page_count = pdf.page_count
-    pdf.close()
-    page_offset = 1 if page_count > 1 else 0
-
-    all_lines = extract_and_group_lines(pdf_path)
-
-    # Detect Title
-    page1_lines = [l for l in all_lines if l["page"] == 1 and not l["in_table"]]
-    title = ""
+    """Main function for 1A logic. Can optionally return all lines for 1B."""
+    lines = extract_and_group_lines(pdf_path)
+    
+    title = Path(pdf_path).stem
+    page1_lines = [l for l in lines if l['page'] == 1]
     if page1_lines:
-        best_fit_for_title = max(page1_lines, key=lambda L: (L["font_size"], -L["y0"]))
-        if best_fit_for_title["y0"] < 550:
-            title = best_fit_for_title["text"]
+        top_lines = sorted(page1_lines, key=lambda x: x['y0'])[:5]
+        if top_lines:
+            title = max(top_lines, key=lambda x: x['font_size'])['text']
 
-    headings = classify_heading_candidates(all_lines)
-    outline = cluster_pages_and_build_outline(headings, all_lines)
-
-    # Filter title out
-    filtered = [o for o in outline if _clean_text(o["text"]) != _clean_text(title)]
-    sorted_outline = sorted(filtered, key=lambda x: x["page"])
-
-    # Adjust page numbers
-    for o in sorted_outline:
-        o['page'] = o['page'] - page_offset
-
+    heading_candidates = classify_heading_candidates(lines)
+    raw_outline = cluster_pages_and_build_outline(heading_candidates, lines)
+    
+    filtered = [o for o in raw_outline if o['text'].strip().lower() != title.strip().lower()]
+    for heading in filtered:
+        matching_lines = [l for l in lines if l['page'] == heading['page'] and l['text'].strip() == heading['text'].strip()]
+        if matching_lines:
+            heading['y0'] = matching_lines[0].get('y0', 0)
+        else:
+            heading['y0'] = 0
+    
+    # --- THIS IS THE UPGRADE ---
+    # If called from 1B, return all the rich data needed for chunking
     if return_all_lines:
-        return title, sorted_outline, all_lines
+        return title, filtered, lines
 
-    return {
-        "title": title,
-        "outline": sorted_outline
-    }
+    # Otherwise, clean up for the final 1A JSON output
+    sorted_outline = sorted(filtered, key=lambda o: (o['page'], o['y0']))
+    for item in sorted_outline:
+        item.pop('y0', None) # Remove temporary key
+
+    return {'title': title, 'outline': sorted_outline}
 
 
 # --- CLI Entrypoint ---
