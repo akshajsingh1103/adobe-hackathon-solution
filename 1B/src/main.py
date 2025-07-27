@@ -3,13 +3,13 @@ import os
 import datetime
 import re
 import sys
+import io
 import argparse
 import math
 from sentence_transformers import SentenceTransformer, util
-import sys
-import io
+
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-sys.stdout = open("debug_log.txt", "w", encoding="utf-8")  # Redirects all prints
+# sys.stdout = open("debug_log.txt", "w", encoding="utf-8")  # Redirects all prints
 
 
 # This tells Python to also look for files in the current script's directory (src)
@@ -177,7 +177,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     PDF_DIR = os.path.join(args.input_dir, "PDFs")
-    QUERY_FILE = os.path.join(args.input_dir, "challenge1b_input.json")
+    QUERY_FILE = os.path.join(args.input_dir, "challenge1b_input2.json")
     OUTPUT_FILE = os.path.join(args.output_dir, "challenge1b_output.json")
     os.makedirs(args.output_dir, exist_ok=True)
 

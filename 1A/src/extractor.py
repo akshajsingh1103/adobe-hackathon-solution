@@ -132,7 +132,7 @@ def classify_heading_candidates(lines):
     for line in lines:
         if line["in_table"] or line["is_last_line"]:        # skip table lines and last lines of page
             continue
-        if line['y0'] > 600:                                # skip footers
+        if line['y0'] > 615:                                # skip footers
             continue
         features = {
             'font_size_diff': line["font_size"] - body_size,
@@ -188,13 +188,11 @@ def cluster_pages_and_build_outline(headings, lines):
     if n_pages == 1:
         seg_dict = {0: [pages[0]]}
     else:
-        from scipy import sparse
         conn = sparse.lil_matrix((n_pages, n_pages))
         for i in range(n_pages - 1):
             conn[i, i + 1] = 1
             conn[i + 1, i] = 1
 
-        from sklearn.cluster import AgglomerativeClustering
         model = AgglomerativeClustering(
             n_clusters=None,
             distance_threshold=0.4,
