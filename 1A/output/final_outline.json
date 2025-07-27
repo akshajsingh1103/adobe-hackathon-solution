@@ -1,5 +1,5 @@
 {
-    "title": "Comprehensive Guide to Major Cities in the South of France",
+    "title": "Ultimate Guide to Activities and Things to Do in the South of France",
     "outline": [
         {
             "level": "H1",
@@ -9,74 +9,158 @@
         },
         {
             "level": "H1",
-            "text": "Overview of the Region",
+            "text": "Coastal Adventures",
             "page": 1,
-            "score": 3.0899
+            "score": 2.5048
+        },
+        {
+            "level": "H2",
+            "text": "Beach Hopping",
+            "page": 1,
+            "score": 2.58004
+        },
+        {
+            "level": "H2",
+            "text": "Water Sports",
+            "page": 1,
+            "score": 2.58004
         },
         {
             "level": "H1",
-            "text": "Travel Tips",
-            "page": 1,
+            "text": "Cultural Experiences",
+            "page": 2,
+            "score": 2.5048
+        },
+        {
+            "level": "H2",
+            "text": "Art and Museums",
+            "page": 2,
+            "score": 3.55974
+        },
+        {
+            "level": "H2",
+            "text": "Historical Sites",
+            "page": 2,
+            "score": 2.58004
+        },
+        {
+            "level": "H1",
+            "text": "Outdoor Activities",
+            "page": 3,
+            "score": 2.5048
+        },
+        {
+            "level": "H2",
+            "text": "Hiking and Biking",
+            "page": 3,
+            "score": 3.55974
+        },
+        {
+            "level": "H2",
+            "text": "Water Activities",
+            "page": 3,
+            "score": 2.5804
+        },
+        {
+            "level": "H1",
+            "text": "Culinary Delights",
+            "page": 4,
+            "score": 2.5048
+        },
+        {
+            "level": "H2",
+            "text": "Wine Tasting",
+            "page": 4,
+            "score": 2.58004
+        },
+        {
+            "level": "H2",
+            "text": "Cooking Classes",
+            "page": 4,
+            "score": 2.58004
+        },
+        {
+            "level": "H1",
+            "text": "Festivals and Events",
+            "page": 5,
+            "score": 3.4845
+        },
+        {
+            "level": "H1",
+            "text": "Relaxation and Wellness",
+            "page": 6,
+            "score": 3.4845
+        },
+        {
+            "level": "H2",
+            "text": "Spa and Wellness Retreats",
+            "page": 6,
+            "score": 3.16514
+        },
+        {
+            "level": "H2",
+            "text": "Yoga and Meditation Retreats",
+            "page": 6,
+            "score": 3.1655
+        },
+        {
+            "level": "H1",
+            "text": "Shopping and Markets",
+            "page": 7,
+            "score": 3.4845
+        },
+        {
+            "level": "H2",
+            "text": "Local Markets",
+            "page": 7,
+            "score": 2.58004
+        },
+        {
+            "level": "H2",
+            "text": "Boutique Shopping",
+            "page": 7,
+            "score": 2.5804
+        },
+        {
+            "level": "H1",
+            "text": "Family-Friendly Activities",
+            "page": 8,
+            "score": 2.5048
+        },
+        {
+            "level": "H2",
+            "text": "Theme Parks and Attractions",
+            "page": 8,
+            "score": 3.16514
+        },
+        {
+            "level": "H2",
+            "text": "Outdoor Adventures",
+            "page": 8,
             "score": 2.5802199999999997
         },
         {
             "level": "H1",
-            "text": "Marseille: The Oldest City in France",
-            "page": 2,
-            "score": 2.3007
-        },
-        {
-            "level": "H1",
-            "text": "Nice: The Jewel of the French Riviera",
-            "page": 4,
-            "score": 1.9061000000000001
-        },
-        {
-            "level": "H1",
-            "text": "Avignon: The City of Popes",
-            "page": 6,
-            "score": 2.6953
-        },
-        {
-            "level": "H1",
-            "text": "Aix-en-Provence: A City of Art and Culture",
-            "page": 7,
-            "score": 1.9061000000000001
-        },
-        {
-            "level": "H1",
-            "text": "Toulouse: The Pink City",
-            "page": 8,
-            "score": 3.0899
-        },
-        {
-            "level": "H1",
-            "text": "Montpellier: A University City with Medieval Charm",
-            "page": 9,
-            "score": 1.9061000000000001
-        },
-        {
-            "level": "H1",
-            "text": "Perpignan: A Blend of French and Catalan Cultures",
+            "text": "Nightlife and Entertainment",
             "page": 10,
-            "score": 1.5115
+            "score": 3.4845
         },
         {
-            "level": "H1",
-            "text": "Arles: A Roman Treasure",
-            "page": 11,
-            "score": 3.0899
+            "level": "H2",
+            "text": "Bars and Lounges",
+            "page": 10,
+            "score": 3.55974
         },
         {
-            "level": "H1",
-            "text": "Carcassonne: A Medieval Fortress",
-            "page": 12,
-            "score": 3.0899
+            "level": "H2",
+            "text": "Nightclubs",
+            "page": 10,
+            "score": 2.97482
         },
         {
             "level": "H1",
             "text": "Conclusion",
-            "page": 13,
+            "page": 12,
             "score": 2.8994
         }
     ]

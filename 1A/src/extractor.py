@@ -34,6 +34,48 @@ def _clean_text(text):
     cleaned = re.sub(r'[^a-z0-9\s]', '', text.lower())
     return re.sub(r'\s+', ' ', cleaned).strip()
 
+# Detect underlined lines
+def detect_underlined_lines(pdf_path, lines):
+    """
+    Scan each page's drawing objects for horizontal lines immediately beneath text.
+    return a set of (page, y0).
+    """
+    doc = fitz.open(pdf_path)
+    underlined = set()
+    # Group lines by page for faster lookup
+    by_page = {}
+    for L in lines:
+        by_page.setdefault(L["page"], []).append(L)
+
+    for page_num, page_lines in by_page.items():
+        page = doc.load_page(page_num-1)
+        # collect all horizontal segments
+        draws = page.get_drawings()
+        for d in draws:
+            for item in d["items"]:
+                op = item[0]
+                if op == "l":                                   # line
+                    (x0, y0), (x1, y1) = item[1], item[2]
+                    if abs(y1 - y0) < 1.0:  # horizontal
+                        # any line whose text-y0 is just above this
+                        for L in page_lines:
+                            if 0 < abs(y0 - L["y1"]) < (L["font_size"]*0.3):
+                                underlined.add((L["page"], L["y0"]))
+                                print(L["text"] +  " has been underlined")
+                elif op == "re":                                # rectangle operator
+                    x, y_top, w, y = item[1]
+                    h = y - y_top
+                    if h >= 0 and h < 2:                     # very short height, likely underline       
+                        # rectangle’s top edge is at y+h
+                        for L in page_lines:
+                            if 0 <= abs(L["y1"] - y_top) < (L["font_size"]*0.3):
+                                underlined.add((L["page"], L["y0"]))
+                                print(L["text"] +  " has been underlined")
+        page = None
+    doc.close()
+    return underlined
+
+
 # --- Main extraction: line-wise grouping with table detection ---
 def extract_and_group_lines(pdf_path):
     doc = fitz.open(pdf_path)
@@ -100,6 +142,7 @@ def extract_and_group_lines(pdf_path):
                 "is_bold": any(s["is_bold"] for s in group),
                 "gap_above": round(gap, 2),
                 "y0": y0,
+                "y1": group[0]["bbox"].y1,                   # group[0]["bbox"].y1
                 "word_count": word_count,
                 "ends_in_period": int(line_text.strip().endswith(".")),
                 "is_short_line": int(word_count <= 2),
@@ -148,7 +191,9 @@ def classify_heading_candidates(lines):
                 "text": line["text"],
                 "page": line["page"],
                 "font_size": line["font_size"],
-                "score": score
+                "is_bold": (int(line["is_bold"])),
+                "score": score,
+                "y0": line["y0"]
             })
     print("\n=== Detected Heading Candidates ===")
     for c in candidates:
@@ -157,7 +202,7 @@ def classify_heading_candidates(lines):
     return candidates
 
 # --- Cluster and Assign H1/H2/H3 ---
-def cluster_pages_and_build_outline(headings, lines):
+def cluster_pages_and_build_outline(headings, lines, underlined):
     if not headings:
         return []
 
@@ -212,18 +257,43 @@ def cluster_pages_and_build_outline(headings, lines):
         headings_by_page[h['page']].append(h)
 
     for seg in page_segments:
-        seg_sizes = sorted({h['font_size'] for p in seg for h in headings_by_page.get(p, [])}, reverse=True)
-        level_map = {s: f"H{i+1}" for i, s in enumerate(seg_sizes[:3])}
-        for p in seg:
-            for h in headings_by_page.get(p, []):
-                lvl = level_map.get(h["font_size"])
-                if lvl:
-                    outline.append({
-                        "level": lvl,
-                        "text": h["text"],
-                        "page": h["page"],
-                        "score": h["score"]
-                    })
+        # collect all headings in this segment
+        seg_heads = [h for p in seg for h in headings_by_page.get(p, [])]
+        # attach underline flag
+        for h in seg_heads:
+            h["_underlined"] = int((h["page"], h["y0"]) in underlined)
+
+        # sort by font_size, bold, then underline as tiebreak
+        seg_heads.sort(key=lambda h: (
+            h["font_size"],
+            int(h.get("is_bold", 0)),
+            h["_underlined"]
+        ), reverse=True)
+
+        # pick distinct (font_size, bold) groups in that order
+        seen = set()
+        top_groups = []
+        for h in seg_heads:
+            grp = (h["font_size"], int(h.get("is_bold",0)), h["_underlined"])
+            if grp not in seen:
+                seen.add(grp)
+                top_groups.append(grp)
+            if len(top_groups) == 3:
+                break
+
+        # map the top 3 groups to H1,H2,H3
+        level_map = {grp: f"H{i+1}" for i, grp in enumerate(top_groups)}
+
+        # emit
+        for h in seg_heads:
+            group = (h["font_size"], int(h["is_bold"]), h["_underlined"])
+            lvl = level_map.get(group, "H3")
+            outline.append({
+                "level": lvl,
+                "text": h["text"],
+                "page": h["page"],
+                "score": h.get("score")
+            })
                   
     return outline
 
@@ -236,6 +306,7 @@ def get_final_outline(pdf_path):
     page_offset = 1 if page_count > 1 else 0
 
     all_lines = extract_and_group_lines(pdf_path)
+    underlined = detect_underlined_lines(pdf_path, all_lines)
 
     # Detect Title
     page1_lines = [l for l in all_lines if l["page"] == 1 and not l["in_table"]]
@@ -250,7 +321,7 @@ def get_final_outline(pdf_path):
             title = best_fit_for_title["text"]
 
     headings = classify_heading_candidates(all_lines)
-    outline = cluster_pages_and_build_outline(headings, all_lines)
+    outline = cluster_pages_and_build_outline(headings, all_lines, underlined)
 
     # Filter title out
     filtered = [o for o in outline if _clean_text(o["text"]) != _clean_text(title)]
