@@ -205,3 +205,5 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+1B/output/challenge1b_output.json
+1A/output/final_outline.json

@@ -6,6 +6,9 @@ import sys
 import argparse
 import math
 from sentence_transformers import SentenceTransformer, util
+import sys
+import io
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 sys.stdout = open("debug_log.txt", "w", encoding="utf-8")  # Redirects all prints
 
 

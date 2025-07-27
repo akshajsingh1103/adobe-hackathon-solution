@@ -241,6 +241,9 @@ def get_final_outline(pdf_path):
 
     # Detect Title
     page1_lines = [l for l in all_lines if l["page"] == 1 and not l["in_table"]]
+    with open('out.txt', 'w', encoding='utf-8') as fout:            # DEBUGGING
+        for line in page1_lines:
+            fout.write(line['text'] + '\n')
     title = ""
     if page1_lines:
         # title is line with greatest font size. if tie, then upper line
