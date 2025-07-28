@@ -10,70 +10,70 @@
             "South of France - Traditions and Culture.pdf"
         ],
         "persona": {
-            "role": "Travel Planner"
+            "role": "Food Connoisseur"
         },
         "job_to_be_done": {
-            "task": "Plan a trip of 4 days for a group of 10 college friends."
+            "task": "Give a list of all popular food delicacies and places to eat."
         },
-        "processing_timestamp": "2025-07-27T14:51:34.369681"
+        "processing_timestamp": "2025-07-28T11:30:41.312149"
     },
     "extracted_sections": [
         {
-            "document": "South of France - Tips and Tricks.pdf",
-            "page_number": 7,
-            "section_title": "City Exploration",
+            "document": "South of France - Cuisine.pdf",
+            "page_number": 1,
+            "section_title": "Introduction",
             "importance_rank": 1
         },
         {
-            "document": "South of France - Tips and Tricks.pdf",
-            "page_number": 4,
-            "section_title": "Gadgets and Accessories",
+            "document": "South of France - Cuisine.pdf",
+            "page_number": 6,
+            "section_title": "Culinary Experiences",
             "importance_rank": 2
         },
         {
-            "document": "South of France - Tips and Tricks.pdf",
+            "document": "South of France - Cuisine.pdf",
             "page_number": 8,
-            "section_title": "Roll Your Clothes: Save space and reduce wrinkles. •",
+            "section_title": "Conclusion",
             "importance_rank": 3
         },
         {
-            "document": "South of France - Tips and Tricks.pdf",
-            "page_number": 9,
-            "section_title": "Conclusion",
+            "document": "South of France - Cuisine.pdf",
+            "page_number": 2,
+            "section_title": "Types of Food",
             "importance_rank": 4
         },
         {
-            "document": "South of France - Tips and Tricks.pdf",
-            "page_number": 1,
-            "section_title": "Introduction",
+            "document": "South of France - Cuisine.pdf",
+            "page_number": 4,
+            "section_title": "Must-Visit Restaurants",
             "importance_rank": 5
         }
     ],
     "subsection_analysis": [
         {
-            "document": "South of France - Tips and Tricks.pdf",
-            "refined_text": "Consider • using public transportation to explore cities eﬃciently. Wine Tours Comfortable Clothing: Wear comfortable, casual clothing suitable for walking and • wine tasting. • Additional Tips: Plan your wine tour route in advance and consider hiring a driver or • joining a guided tour to avoid drinking and driving.",
-            "page_number": 7
+            "document": "South of France - Cuisine.pdf",
+            "refined_text": "The South of France, known for its stunning landscapes and charming villages, is also a paradise for food lovers. The region's cuisine is a delightful blend of Mediterranean flavors, fresh ingredients, and traditional recipes passed down through generations. This guide will take you through the diﬀerent types of food, famous dishes, must-visit restaurants, renowned wine regions, and the types of wines they produce to help you plan an unforgettable culinary adventure.",
+            "page_number": 1
         },
         {
-            "document": "South of France - Tips and Tricks.pdf",
-            "refined_text": "Bring a travel • adapter if needed. • Books and Entertainment: A book, e-reader, or tablet for entertainment during • travel. Additional Tips: Download maps and travel guides to your devices for oﬄine use.",
-            "page_number": 4
+            "document": "South of France - Cuisine.pdf",
+            "refined_text": "Food Markets: Visit local markets such as the Cours Saleya Market in Nice or the • Marché Forville in Cannes to sample fresh produce, cheeses, and charcuterie. Look for restaurants that highlight seasonal, locally grown produce and sustainably raised meats. Dining at a farm-to-table restaurant is a wonderful way to support local agriculture and enjoy the freshest ingredients available.",
+            "page_number": 6
         },
         {
-            "document": "South of France - Tips and Tricks.pdf",
-            "refined_text": "Pack a Day Bag: Bring a small day bag for daily excursions. • Leave Room for Souvenirs: Leave extra space or bring a foldable bag for souvenirs. • Additional Tips: Pack a small travel umbrella, a reusable shopping bag, and a • portable phone charger.",
+            "document": "South of France - Cuisine.pdf",
+            "refined_text": "The South of France oﬀers a rich and diverse culinary landscape that is sure to delight any food lover. From fresh seafood and Provençal dishes to iconic restaurants and unique culinary experiences, there is something for everyone to enjoy. Use this guide to plan your culinary journey and savor the tastes of the South of France, creating memories that will linger long after your trip has ended.",
             "page_number": 8
         },
         {
-            "document": "South of France - Tips and Tricks.pdf",
-            "refined_text": "Packing for a trip to the South of France involves considering the season, planned activities, and the needs of both adults and children. By following this comprehensive guide and incorporating the tips and tricks provided, you'll be well-prepared for a comfortable and enjoyable trip. Remember to pack light, versatile clothing, and essential items to make the most of your travel experience.",
-            "page_number": 9
+            "document": "South of France - Cuisine.pdf",
+            "refined_text": "The cuisine in the South of France is diverse, reflecting the region's rich history and cultural influences. Here are some key types of food you can expect to find: Seafood: With its extensive coastline, the South of France oﬀers an abundance of fresh • seafood. Niçoise Cuisine: Originating from Nice, this cuisine includes dishes like Salade Niçoise, • a salad with tuna, olives, and anchovies, and Socca, a chickpea flour pancake.",
+            "page_number": 2
         },
         {
-            "document": "South of France - Tips and Tricks.pdf",
-            "refined_text": "Planning a trip to the South of France requires thoughtful preparation to ensure a comfortable and enjoyable experience. This guide covers everything from packing essentials to travel tips, catering to all seasons and various activities. Whether you're traveling solo, with kids, or in a group, this guide will help you make the most of your trip.",
-            "page_number": 1
+            "document": "South of France - Cuisine.pdf",
+            "refined_text": "The menu features dishes that highlight the region's fresh, seasonal ingredients. The restaurant's tasting menu oﬀers a journey through the flavors of Provence, with each course showcasing the region's finest ingredients. The menu features dishes that pair beautifully with the local wines, creating a truly memorable dining experience.",
+            "page_number": 4
         }
     ]
 }

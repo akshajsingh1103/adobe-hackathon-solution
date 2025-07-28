@@ -1,0 +1,81 @@
+{
+    "metadata": {
+        "input_documents": [
+            "Breakfast Ideas.pdf",
+            "Dinner Ideas - Mains_1.pdf",
+            "Dinner Ideas - Mains_2.pdf",
+            "Dinner Ideas - Mains_3.pdf",
+            "Dinner Ideas - Sides_1.pdf",
+            "Dinner Ideas - Sides_2.pdf",
+            "Dinner Ideas - Sides_3.pdf",
+            "Dinner Ideas - Sides_4.pdf",
+            "Lunch Ideas.pdf"
+        ],
+        "persona": {
+            "role": "Food Contractor"
+        },
+        "job_to_be_done": {
+            "task": "Prepare a vegetarian buffet-style dinner menu for a corporate gathering, including gluten-free items."
+        },
+        "processing_timestamp": "2025-07-28T12:39:48.630727"
+    },
+    "extracted_sections": [
+        {
+            "document": "Dinner Ideas - Mains_1.pdf",
+            "page_number": 3,
+            "section_title": "Ingredients:",
+            "importance_rank": 1
+        },
+        {
+            "document": "Lunch Ideas.pdf",
+            "page_number": 2,
+            "section_title": "Ingredients:",
+            "importance_rank": 2
+        },
+        {
+            "document": "Lunch Ideas.pdf",
+            "page_number": 4,
+            "section_title": "Instructions:",
+            "importance_rank": 3
+        },
+        {
+            "document": "Lunch Ideas.pdf",
+            "page_number": 13,
+            "section_title": "Ingredients:",
+            "importance_rank": 4
+        },
+        {
+            "document": "Dinner Ideas - Mains_3.pdf",
+            "page_number": 6,
+            "section_title": "Ingredients:",
+            "importance_rank": 5
+        }
+    ],
+    "subsection_analysis": [
+        {
+            "document": "Dinner Ideas - Mains_1.pdf",
+            "refined_text": " 1 pound ground beef  1 small onion, diced  2 cloves garlic, minced  1 carrot, grated  1 celery stalk, diced  1 can (28 ounces) crushed tomatoes  1/4 cup tomato paste  1/2 cup red wine (optional)  1 teaspoon dried oregano  1 teaspoon dried basil  Salt and pepper to taste  Spaghetti for serving  Grated Parmesan cheese for garnish",
+            "page_number": 3
+        },
+        {
+            "document": "Lunch Ideas.pdf",
+            "refined_text": "1 whole wheat tortilla • 1 cup cooked chicken breast, sliced • 1 cup romaine lettuce, chopped • 2 tablespoons Caesar dressing • 2 tablespoons grated Parmesan cheese • Optional: croutons for extra crunch •",
+            "page_number": 2
+        },
+        {
+            "document": "Lunch Ideas.pdf",
+            "refined_text": "In a bowl, combine the chicken, mayonnaise, Dijon mustard, celery, and grapes. • Season with salt and pepper. • Veggie and Hummus Wrap Ingredients: 1 whole wheat tortilla • 1/2 cup hummus • 1/2 cup cucumber, sliced • 1/2 cup bell pepper, sliced • 1/4 cup shredded carrots • 1/4 cup baby spinach •",
+            "page_number": 4
+        },
+        {
+            "document": "Lunch Ideas.pdf",
+            "refined_text": "1 whole wheat tortilla • 1/2 cup shredded cheese • 1/4 cup bell pepper, sliced • 1/4 cup zucchini, sliced • 1/4 cup red onion, sliced •",
+            "page_number": 13
+        },
+        {
+            "document": "Dinner Ideas - Mains_3.pdf",
+            "refined_text": " 2 pounds pork ribs  1/4 cup honey  1/4 cup soy sauce  2 tablespoons rice vinegar  3 cloves garlic, minced  1 teaspoon grated ginger  1 teaspoon paprika  Salt and pepper to taste  Sliced green onions for garnish",
+            "page_number": 6
+        }
+    ]
+}

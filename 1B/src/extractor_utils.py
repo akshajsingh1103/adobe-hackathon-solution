@@ -34,6 +34,46 @@ def _clean_text(text):
     cleaned = re.sub(r'[^a-z0-9\s]', '', text.lower())
     return re.sub(r'\s+', ' ', cleaned).strip()
 
+def detect_underlined_lines(pdf_path, lines):
+    """
+    Scan each page's drawing objects for horizontal lines immediately beneath text.
+    return a set of (page, y0).
+    """
+    doc = fitz.open(pdf_path)
+    underlined = set()
+    # Group lines by page for faster lookup
+    by_page = {}
+    for L in lines:
+        by_page.setdefault(L["page"], []).append(L)
+
+    for page_num, page_lines in by_page.items():
+        page = doc.load_page(page_num-1)
+        # collect all horizontal segments
+        draws = page.get_drawings()
+        for d in draws:
+            for item in d["items"]:
+                op = item[0]
+                if op == "l":                                   # line
+                    (x0, y0), (x1, y1) = item[1], item[2]
+                    if abs(y1 - y0) < 1.0:  # horizontal
+                        # any line whose text-y0 is just above this
+                        for L in page_lines:
+                            if 0 < abs(y0 - L["y1"]) < (L["font_size"]*0.3):
+                                underlined.add((L["page"], L["y0"]))
+                                print(L["text"] +  " has been underlined")
+                elif op == "re":                                # rectangle operator
+                    x, y_top, w, y = item[1]
+                    h = y - y_top
+                    if h >= 0 and h < 2:                     # very short height, likely underline       
+                        # rectangle’s top edge is at y+h
+                        for L in page_lines:
+                            if 0 <= abs(L["y1"] - y_top) < (L["font_size"]*0.3):
+                                underlined.add((L["page"], L["y0"]))
+                                print(L["text"] +  " has been underlined")
+        page = None
+    doc.close()
+    return underlined
+
 # --- Main extraction: line-wise grouping with table detection ---
 def extract_and_group_lines(pdf_path):
     doc = fitz.open(pdf_path)
@@ -100,6 +140,7 @@ def extract_and_group_lines(pdf_path):
                 "is_bold": any(s["is_bold"] for s in group),
                 "gap_above": round(gap, 2),
                 "y0": y0,
+                "y1": group[0]["bbox"].y1, 
                 "word_count": word_count,
                 "ends_in_period": int(line_text.strip().endswith(".")),
                 "is_short_line": int(word_count <= 2),
@@ -119,6 +160,8 @@ def extract_and_group_lines(pdf_path):
     return all_lines
 
 # --- Classify Headings ---
+# In 1B/src/extractor_utils.py
+
 def classify_heading_candidates(lines):
     if not lines:
         return []
@@ -130,10 +173,11 @@ def classify_heading_candidates(lines):
     candidates = []
 
     for line in lines:
-        if line["in_table"] or line["is_last_line"]:        # skip table lines and last lines of page
+        if line["in_table"] or line["is_last_line"]:
             continue
-        if line['y0'] > 600:                                # skip footers
+        if line['y0'] > 600:
             continue
+            
         features = {
             'font_size_diff': line["font_size"] - body_size,
             'is_bold': int(line["is_bold"]),
@@ -143,17 +187,23 @@ def classify_heading_candidates(lines):
             'is_short_line': line["is_short_line"],
         }
         score = INTERCEPT + sum(features[k] * WEIGHTS.get(k, 0) for k in features)
+        
         if score > 1:
+            # --- THIS IS THE FIX ---
+            # We now include the y0 value directly in the candidate object
             candidates.append({
                 "text": line["text"],
                 "page": line["page"],
                 "font_size": line["font_size"],
+                "is_bold": line["is_bold"],
+                "y0": line["y0"], # Keep the vertical position
                 "score": score
             })
+
     return candidates
 
 # --- Cluster and Assign H1/H2/H3 ---
-def cluster_pages_and_build_outline(headings, lines):
+def cluster_pages_and_build_outline(headings, lines, underlined):
     if not headings:
         return []
 
@@ -184,13 +234,11 @@ def cluster_pages_and_build_outline(headings, lines):
     if n_pages == 1:
         seg_dict = {0: [pages[0]]}
     else:
-        from scipy import sparse
         conn = sparse.lil_matrix((n_pages, n_pages))
         for i in range(n_pages - 1):
             conn[i, i + 1] = 1
             conn[i + 1, i] = 1
 
-        from sklearn.cluster import AgglomerativeClustering
         model = AgglomerativeClustering(
             n_clusters=None,
             distance_threshold=0.4,
@@ -210,18 +258,45 @@ def cluster_pages_and_build_outline(headings, lines):
         headings_by_page[h['page']].append(h)
 
     for seg in page_segments:
-        seg_sizes = sorted({h['font_size'] for p in seg for h in headings_by_page.get(p, [])}, reverse=True)
-        level_map = {s: f"H{i+1}" for i, s in enumerate(seg_sizes[:3])}
-        for p in seg:
-            for h in headings_by_page.get(p, []):
-                lvl = level_map.get(h["font_size"])
-                if lvl:
-                    outline.append({
-                        "level": lvl,
-                        "text": h["text"],
-                        "page": h["page"],
-                        "score": h["score"]
-                    })
+        # collect all headings in this segment
+        seg_heads = [h for p in seg for h in headings_by_page.get(p, [])]
+        # attach underline flag
+        for h in seg_heads:
+            h["_underlined"] = int((h["page"], h["y0"]) in underlined)
+
+        # sort by font_size, bold, then underline as tiebreak
+        seg_heads.sort(key=lambda h: (
+            h["font_size"],
+            int(h.get("is_bold", 0)),
+            h["_underlined"]
+        ), reverse=True)
+
+        # pick distinct (font_size, bold) groups in that order
+        seen = set()
+        top_groups = []
+        for h in seg_heads:
+            grp = (h["font_size"], int(h.get("is_bold",0)), h["_underlined"])
+            if grp not in seen:
+                seen.add(grp)
+                top_groups.append(grp)
+            if len(top_groups) == 3:
+                break
+
+        # map the top 3 groups to H1,H2,H3
+        level_map = {grp: f"H{i+1}" for i, grp in enumerate(top_groups)}
+
+        # emit
+        for h in seg_heads:
+            group = (h["font_size"], int(h["is_bold"]), h["_underlined"])
+            lvl = level_map.get(group, "H3")
+            outline.append({
+                "level": lvl,
+                "text": h["text"],
+                "page": h["page"],
+                "y0": h["y0"],
+                "score": h.get("score")
+            })
+                  
     return outline
 
 
@@ -230,37 +305,36 @@ def cluster_pages_and_build_outline(headings, lines):
 
 # In 1B/src/extractor_utils.py
 
+# In 1B/src/extractor_utils.py
+
 def get_final_outline(pdf_path, return_all_lines=False):
     """Main function for 1A logic. Can optionally return all lines for 1B."""
     lines = extract_and_group_lines(pdf_path)
+    underlined = detect_underlined_lines(pdf_path, lines)
     
     title = Path(pdf_path).stem
-    page1_lines = [l for l in lines if l['page'] == 1]
+    page1_lines = [l for l in lines if l['page'] == 1 and not l['in_table']]
     if page1_lines:
-        top_lines = sorted(page1_lines, key=lambda x: x['y0'])[:5]
-        if top_lines:
-            title = max(top_lines, key=lambda x: x['font_size'])['text']
+        best_fit_for_title = max(page1_lines, key = lambda L: (L["font_size"], -L["y0"]))
+        if best_fit_for_title["y0"] < 550:
+            title = best_fit_for_title["text"]
 
+    # --- THIS IS THE FIX ---
+    # The candidates now correctly contain the y0 value from the start.
+    # No need for the extra, buggy loop here.
     heading_candidates = classify_heading_candidates(lines)
-    raw_outline = cluster_pages_and_build_outline(heading_candidates, lines)
     
-    filtered = [o for o in raw_outline if o['text'].strip().lower() != title.strip().lower()]
-    for heading in filtered:
-        matching_lines = [l for l in lines if l['page'] == heading['page'] and l['text'].strip() == heading['text'].strip()]
-        if matching_lines:
-            heading['y0'] = matching_lines[0].get('y0', 0)
-        else:
-            heading['y0'] = 0
+    raw_outline = cluster_pages_and_build_outline(heading_candidates, lines, underlined)
+
+    filtered = [o for o in raw_outline if _clean_text(o["text"]) != _clean_text(title)]
     
-    # --- THIS IS THE UPGRADE ---
-    # If called from 1B, return all the rich data needed for chunking
     if return_all_lines:
         return title, filtered, lines
 
-    # Otherwise, clean up for the final 1A JSON output
-    sorted_outline = sorted(filtered, key=lambda o: (o['page'], o['y0']))
+    sorted_outline = sorted(filtered, key=lambda o: (o['page'], o.get('y0', 0)))
     for item in sorted_outline:
-        item.pop('y0', None) # Remove temporary key
+        item.pop('y0', None)
+        item.pop('score', None) # Clean up score for final 1A output
 
     return {'title': title, 'outline': sorted_outline}
 

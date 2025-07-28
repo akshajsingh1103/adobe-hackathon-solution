@@ -18,61 +18,54 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 # Now we can correctly import the functions from our 1A utility file
 from extractor_utils import get_final_outline
 
+# In 1B/src/main.py
+
 def chunk_document_into_sections(pdf_path, title, outline, all_lines):
-    """Groups a document's lines into sections based on the heading structure."""
-    # 1. DEBUG: Print the outline headings received
-    print("\n--- DEBUG: OUTLINE HEADINGS ---")
-    for h in outline:
-        print(f"[Page {h['page']}] y0: {h.get('y0', 0):.2f} → \"{h['text']}\"")
-    if not outline:
+    """
+    Groups a document's lines into sections based on ONLY H1 headings.
+    The content of an H1 section runs until the next H1.
+    """
+    if not outline or not any(h.get('level') == 'H1' for h in outline):
+        # If there are no H1s, treat the whole document as one section
         full_text = " ".join(line['text'] for line in all_lines)
         return [{"section_title": title, "page_number": 1, "content": full_text, "document_name": os.path.basename(pdf_path)}]
 
     sections = []
-    sorted_headings = sorted(outline, key=lambda x: (x['page'], x.get('y0', 0)))
-    # 2. Build heading map for float-tolerant comparison
-    heading_y0s = {(h['page'], h['text']): h.get('y0', 0) for h in sorted_headings}
+    # --- THIS IS THE FIX ---
+    # First, find only the H1 headings to use as our main boundaries
+    h1_headings = sorted(
+        [h for h in outline if h.get('level') == 'H1'], 
+        key=lambda x: (x['page'], x.get('y0', 0))
+    )
 
-    for i, heading in enumerate(sorted_headings):
+    for i, current_h1 in enumerate(h1_headings):
         section_text = []
-        start_page = heading['page']
-        start_y0 = heading.get('y0', 0)
+        start_page = current_h1['page']
+        start_y0 = current_h1.get('y0', 0)
 
+        # The end boundary is the start of the NEXT H1
         end_page, end_y0 = float('inf'), float('inf')
-        if i + 1 < len(sorted_headings):
-            next_heading = sorted_headings[i+1]
-            end_page = next_heading['page']
-            end_y0 = next_heading.get('y0', 0)
-        print(f"\n--- DEBUG: NEAR HEADING '{heading['text']}' ON PAGE {heading['page']} ---")
+        if i + 1 < len(h1_headings):
+            next_h1 = h1_headings[i+1]
+            end_page = next_h1['page']
+            end_y0 = next_h1.get('y0', 0)
+
+        # Collect all lines that fall between this H1 and the next one
         for line in all_lines:
-            page = line.get('page')
-            y0 = line.get('y0', 0)
+            # We don't need to check if the line is a heading, just if it's in the boundary
             is_after_start = line['page'] > start_page or (line['page'] == start_page and line.get('y0', 0) > start_y0)
             is_before_end = line['page'] < end_page or (line['page'] == end_page and line.get('y0', 0) < end_y0)
             
             if is_after_start and is_before_end:
-                is_heading_line = any(
-                    page == h_page and math.isclose(y0, h_y0, abs_tol=1.0)
-                    for (h_page, _), h_y0 in heading_y0s.items()
-                )
-                if is_heading_line:
-                    print(f"  [SKIP heading line at y0={y0:.2f}] {line['text']}")  # <-- ADD DEBUG HERE
-                    continue
-
-                print(f"  [ADD] y0={y0:.2f} → {line['text']}")
                 section_text.append(line['text'])
         
         sections.append({
-            "section_title": heading['text'],
-            "page_number": heading['page'],
-            "content": " ".join(section_text),
+            "section_title": current_h1['text'],
+            "page_number": current_h1['page'],
+            "content": " ".join(section_text).strip(),
             "document_name": os.path.basename(pdf_path)
         })
-        print("\n--- Debug: Extracted Sections ---")
-    for sec in sections:
-        print(f"Section: {sec['section_title']} | Page: {sec['page_number']}")
-        print(f"  → Content Preview: {sec['content'][:700]}...\n")
-
+        
     return sections
 
 def deconstruct_pdfs(pdf_dir):
@@ -177,8 +170,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     PDF_DIR = os.path.join(args.input_dir, "PDFs")
-    QUERY_FILE = os.path.join(args.input_dir, "challenge1b_input2.json")
-    OUTPUT_FILE = os.path.join(args.output_dir, "challenge1b_output.json")
+    QUERY_FILE = os.path.join(args.input_dir, "challenge1b2_input.json")
+    OUTPUT_FILE = os.path.join(args.output_dir, "challenge1b2_output.json")
     os.makedirs(args.output_dir, exist_ok=True)
 
     print("--- Loading user query ---")
