@@ -1,0 +1,20 @@
+# Use slim Python image
+FROM python:3.10-slim
+
+# Set working directory inside the container
+WORKDIR /app
+
+# Install required system packages (poppler-utils needed for some PDF tools)
+RUN apt-get update && \
+    apt-get install -y build-essential poppler-utils && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy all source files to container
+COPY . .
+
+# Set default command to run your extractor script
+CMD ["python", "extractor.py"]

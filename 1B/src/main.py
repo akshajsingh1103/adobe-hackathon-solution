@@ -3,11 +3,14 @@ import os
 import datetime
 import re
 import sys
-import argparse
-from sentence_transformers import SentenceTransformer, util
-import sys
 import io
+import argparse
+
+from sentence_transformers import SentenceTransformer, util
+
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+# sys.stdout = open("debug_log.txt", "w", encoding="utf-8")  # Redirects all prints
+
 
 # This tells Python to also look for files in the current script's directory (src)
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -15,49 +18,65 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 # Now we can correctly import the functions from our 1A utility file
 from extractor_utils import get_final_outline
 
+# In 1B/src/main.py
+
 def chunk_document_into_sections(pdf_path, title, outline, all_lines):
-    """Groups a document's lines into sections based on the heading structure."""
-    if not outline:
+    """
+    Groups a document's lines into sections based on ONLY H1 headings.
+    The content of an H1 section runs until the next H1.
+    """
+    if not outline or not any(h.get('level') == 'H1' for h in outline):
+        # If there are no H1s, treat the whole document as one section
         full_text = " ".join(line['text'] for line in all_lines)
         return [{"section_title": title, "page_number": 1, "content": full_text, "document_name": os.path.basename(pdf_path)}]
 
     sections = []
-    sorted_headings = sorted(outline, key=lambda x: (x['page'], x.get('y0', 0)))
+    # --- THIS IS THE FIX ---
+    # First, find only the H1 headings to use as our main boundaries
+    h1_headings = sorted(
+        [h for h in outline if h.get('level') == 'H1'], 
+        key=lambda x: (x['page'], x.get('y0', 0))
+    )
 
-    for i, heading in enumerate(sorted_headings):
+    for i, current_h1 in enumerate(h1_headings):
         section_text = []
-        start_page = heading['page']
-        start_y0 = heading.get('y0', 0)
+        start_page = current_h1['page']
+        start_y0 = current_h1.get('y0', 0)
 
+        # The end boundary is the start of the NEXT H1
         end_page, end_y0 = float('inf'), float('inf')
-        if i + 1 < len(sorted_headings):
-            next_heading = sorted_headings[i+1]
-            end_page = next_heading['page']
-            end_y0 = next_heading.get('y0', 0)
+        if i + 1 < len(h1_headings):
+            next_h1 = h1_headings[i+1]
+            end_page = next_h1['page']
+            end_y0 = next_h1.get('y0', 0)
 
+        # Collect all lines that fall between this H1 and the next one
         for line in all_lines:
+            # We don't need to check if the line is a heading, just if it's in the boundary
             is_after_start = line['page'] > start_page or (line['page'] == start_page and line.get('y0', 0) > start_y0)
             is_before_end = line['page'] < end_page or (line['page'] == end_page and line.get('y0', 0) < end_y0)
             
             if is_after_start and is_before_end:
                 section_text.append(line['text'])
         
+        # print("\n--- Debug: Section Created ---")
+        # print(f"Title: {current_h1['text']}")
+        # print(f"Page: {current_h1['page']}")
+        # print(f"Content Preview: {' '.join(section_text)[:300]}...")
+        # print(f"Total Length: {len(' '.join(section_text))} characters")
+
         sections.append({
-            "section_title": heading['text'],
-            "page_number": heading['page'],
-            "content": " ".join(section_text),
+            "section_title": current_h1['text'],
+            "page_number": current_h1['page'],
+            "content": " ".join(section_text).strip(),
             "document_name": os.path.basename(pdf_path)
         })
-        print("\n--- Debug: Extracted Sections ---")
-    for sec in sections:
-        print(f"Section: {sec['section_title']} | Page: {sec['page_number']}")
-        print(f"  -> Content Preview: {sec['content'][:200]}...\n")
-
+        
     return sections
 
 def deconstruct_pdfs(pdf_dir):
     """Uses our 1A logic to process all PDFs and create a master list of sections."""
-    print("--- Step 1: Deconstructing PDFs into sections ---")
+    # print("--- Step 1: Deconstructing PDFs into sections ---")
     all_sections = []
     
     if not os.path.isdir(pdf_dir):
@@ -71,17 +90,17 @@ def deconstruct_pdfs(pdf_dir):
 
     for pdf_file in pdf_files:
         pdf_path = os.path.join(pdf_dir, pdf_file)
-        print(f"  - Processing {pdf_file}...")
+        # print(f"  - Processing {pdf_file}...")
         title, outline, all_lines = get_final_outline(pdf_path, return_all_lines=True)
         doc_sections = chunk_document_into_sections(pdf_path, title, outline, all_lines)
         all_sections.extend(doc_sections)
     
-    print(f"Found {len(all_sections)} total sections across all documents.")
+    # print(f"Found {len(all_sections)} total sections across all documents.")
     return all_sections
 
 def run_semantic_search(query, sections, model):
     """Uses a sentence transformer to find and rank the most relevant sections."""
-    print("\n--- Step 2: Running Semantic Search ---")
+    # print("\n--- Step 2: Running Semantic Search ---")
     if not sections: return []
         
     # --- UPGRADE: Create a smarter corpus by combining titles and content ---
@@ -92,9 +111,9 @@ def run_semantic_search(query, sections, model):
 
     corpus_embeddings = model.encode(corpus, convert_to_tensor=True, show_progress_bar=True)
     query_embedding = model.encode(query, convert_to_tensor=True)
-    print("\n>>> Debug: Corpus being searched against:")
-    for i, c in enumerate(corpus[:5]):
-        print(f"  [{i+1}] {c[:200]}...\n")
+    # print("\n>>> Debug: Corpus being searched against:")
+    # for i, c in enumerate(corpus[:5]):
+        # print(f"  [{i+1}] {c[:200]}...\n")
 
     
     # Increase top_k to get a better pool of candidates for sub-section analysis
@@ -102,7 +121,7 @@ def run_semantic_search(query, sections, model):
     print("\n>>> Debug: Top matched sections with scores:")
     for r in search_results[:5]:
         matched_section = sections[corpus_map[r['corpus_id']]]
-        print(f"  Score: {r['score']:.4f} | Section: {matched_section['section_title']} (Page {matched_section['page_number']})")
+        # print(f"  Score: {r['score']:.4f} | Section: {matched_section['section_title']} (Page {matched_section['page_number']})")
     
     ranked_sections = []
     for result in search_results:
@@ -111,12 +130,12 @@ def run_semantic_search(query, sections, model):
         section['relevance_score'] = result['score']
         ranked_sections.append(section)
         
-    print(f"Found {len(ranked_sections)} relevant sections.")
+    # print(f"Found {len(ranked_sections)} relevant sections.")
     return ranked_sections
 
 def perform_subsection_analysis(query, top_sections, model):
     """For each top section, finds the most relevant 'Refined Text'."""
-    print("\n--- Step 3: Performing Sub-section Analysis ---")
+    # print("\n--- Step 3: Performing Sub-section Analysis ---")
     
     for section in top_sections:
         content = section['content']
@@ -132,11 +151,11 @@ def perform_subsection_analysis(query, top_sections, model):
         
         # --- UPGRADE: Find the top 3 sentences and join them for a better summary ---
         best_sentence_results = util.semantic_search(query_embedding, sentence_embeddings, top_k=3)[0]
-        print(f"\n→ From Section: {section['section_title']} (Page {section['page_number']})")
-        print("Top Sentences Picked:")
-        for result in best_sentence_results:
-            sent = sentences[result['corpus_id']]
-            print(f"  [{result['score']:.4f}] {sent}")
+        # print(f"\n→ From Section: {section['section_title']} (Page {section['page_number']})")
+        # print("Top Sentences Picked:")
+        # for result in best_sentence_results:
+        #     sent = sentences[result['corpus_id']]
+        #     print(f"  [{result['score']:.4f}] {sent}")
 
         
         if best_sentence_results:
@@ -152,13 +171,13 @@ def perform_subsection_analysis(query, top_sections, model):
 # --- Main Execution ---
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Performs persona-driven analysis on a collection of PDFs.")
-    parser.add_argument('--input_dir', default="1B/input", help='Path to the input directory')
-    parser.add_argument('--output_dir', default="1B/output", help='Path to the output directory')
+    parser.add_argument('--input_dir', default="/app/input", help='Path to the input directory')
+    parser.add_argument('--output_dir', default="/app/output", help='Path to the output directory')
     args = parser.parse_args()
 
     PDF_DIR = os.path.join(args.input_dir, "PDFs")
-    QUERY_FILE = os.path.join(args.input_dir, "challenge1b_input.json")
-    OUTPUT_FILE = os.path.join(args.output_dir, "challenge1b_output.json")
+    QUERY_FILE = os.path.join(args.input_dir, "challenge1b_input2.json")
+    OUTPUT_FILE = os.path.join(args.output_dir, "challenge1b2_output.json")
     os.makedirs(args.output_dir, exist_ok=True)
 
     print("--- Loading user query ---")
@@ -182,7 +201,8 @@ if __name__ == "__main__":
     print(f"Query: {user_query}")
 
     print("\n--- Loading Semantic Model (this may take a moment on first run) ---")
-    model = SentenceTransformer('all-MiniLM-L6-v2')
+    model = SentenceTransformer('models/all-MiniLM-L6-v2')
+
     
     all_sections = deconstruct_pdfs(PDF_DIR)
     
