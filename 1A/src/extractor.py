@@ -19,16 +19,6 @@ WEIGHTS = {
 }
 INTERCEPT = 1.6011
 
-# WEIGHTS = {
-#     'font_size_diff': 0.5019,
-#     'is_bold': 3.0546,
-#     'gap_above': 0.0016,
-#     'word_count': -0.4218,
-#     'ends_in_period': -2.7970,
-#     'is_short_line': -1.4046,
-# }
-# INTERCEPT = 1.7762
-
 # --- Helper: Normalize text ---
 def _clean_text(text):
     cleaned = re.sub(r'[^a-z0-9\s]', '', text.lower())
@@ -48,7 +38,7 @@ def extract_and_group_lines(pdf_path):
         try:
             blocks = page.get_text("dict").get("blocks", [])
             tables = page.find_tables().tables
-            table_areas = [t.bbox for t in tables]
+            table_areas = [fitz.Rect(t.bbox) for t in tables]
         except Exception as e:
             print(f"Skipping page {page_num+1} due to MuPDF error: {e}")
             continue
@@ -62,8 +52,28 @@ def extract_and_group_lines(pdf_path):
                         if not text:
                             continue
                         bbox = fitz.Rect(span.get("bbox"))
-                        in_table = any(bbox.intersects(tb) for tb in table_areas)
+                        raw_text = span.get("text", "").strip()
+
+                        # Default: assume it's in table if intersects with any table bbox
+                        in_table = any(tb.contains(bbox) for tb in table_areas)
+
+                        # Heuristic override: looks like a sentence (likely not a table cell)
+                        looks_like_sentence = (
+                            raw_text and
+                            raw_text[0].isupper() and
+                            raw_text[-1] in ".?" and
+                            len(raw_text.split()) >= 5  # at least 5 words
+                        )
+
+                        is_link_like = bool(re.search(r"(https?://|www\.|mailto:|\.com|\.org|\|)", raw_text, re.IGNORECASE))
+                        if (is_link_like): continue
+
+                        # Override table flag if it's clearly a sentence and not a link
+                        if in_table and (looks_like_sentence and not is_link_like):
+                            in_table = False
                         is_bold = "bold" in span.get("font", "").lower() or span.get("flags", 0) & 2
+
+                        # if (is_bold): print(text, round(span.get("size"), 2), in_table, page_num, bbox)
 
                         spans.append({
                             'text': text,
@@ -326,6 +336,18 @@ def cluster_pages_and_build_outline(headings, lines):
                   
     return outline
 
+def find_first_content_page(all_lines, min_words=1):
+    page_word_counts = defaultdict(int)
+    for line in all_lines:
+        if not is_noise_line(line["text"]):
+            page_word_counts[line["page"]] += len(line["text"].split())
+
+    # Sort by page number and return the first with enough words
+    for page in sorted(page_word_counts):
+        if page_word_counts[page] >= min_words:
+            return page
+    return 1  # fallback if no good page is found
+
 
 # --- Final Output ---
 def get_final_outline(pdf_path):
@@ -337,7 +359,8 @@ def get_final_outline(pdf_path):
     all_lines = extract_and_group_lines(pdf_path)
 
     # Detect Title
-    page1_lines = [l for l in all_lines if l["page"] == 1 and not l["in_table"]]
+    first_text_page = find_first_content_page(all_lines)
+    page1_lines = [l for l in all_lines if l["page"] == first_text_page and not l["in_table"]]
     title = ""
     if page1_lines:
         # title is line with greatest font size. if tie, then upper line
