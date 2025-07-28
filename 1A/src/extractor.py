@@ -19,6 +19,16 @@ WEIGHTS = {
 }
 INTERCEPT = 1.6011
 
+# WEIGHTS = {
+#     'font_size_diff': 0.5019,
+#     'is_bold': 3.0546,
+#     'gap_above': 0.0016,
+#     'word_count': -0.4218,
+#     'ends_in_period': -2.7970,
+#     'is_short_line': -1.4046,
+# }
+# INTERCEPT = 1.7762
+
 # --- Helper: Normalize text ---
 def _clean_text(text):
     cleaned = re.sub(r'[^a-z0-9\s]', '', text.lower())
@@ -28,6 +38,48 @@ def is_noise_line(text):
     # Line is mostly punctuation or contains long stretches of dots
     return bool(re.match(r"^[. \t]{5,}.*\d{1,3}$", text.strip())) or \
            bool(re.match(r"^.*\.{5,}.*\d{1,3}$", text.strip()))
+
+# Detect underlined lines
+def detect_underlined_lines(pdf_path, lines):
+    """
+    Scan each page's drawing objects for horizontal lines immediately beneath text.
+    return a set of (page, y0).
+    """
+    doc = fitz.open(pdf_path)
+    underlined = set()
+    # Group lines by page for faster lookup
+    by_page = {}
+    for L in lines:
+        by_page.setdefault(L["page"], []).append(L)
+
+    for page_num, page_lines in by_page.items():
+        page = doc.load_page(page_num-1)
+        # collect all horizontal segments
+        draws = page.get_drawings()
+        for d in draws:
+            for item in d["items"]:
+                op = item[0]
+                if op == "l":                                   # line
+                    (x0, y0), (x1, y1) = item[1], item[2]
+                    if abs(y1 - y0) < 1.0:  # horizontal
+                        # any line whose text-y0 is just above this
+                        for L in page_lines:
+                            if 0 < abs(y0 - L["y1"]) < (L["font_size"]*0.3):
+                                underlined.add((L["page"], L["y0"]))
+                                print(L["text"] +  " has been underlined")
+                elif op == "re":                                # rectangle operator
+                    x, y_top, w, y = item[1]
+                    h = y - y_top
+                    if h >= 0 and h < 2:                     # very short height, likely underline       
+                        # rectangle’s top edge is at y+h
+                        for L in page_lines:
+                            if 0 <= abs(L["y1"] - y_top) < (L["font_size"]*0.3):
+                                underlined.add((L["page"], L["y0"]))
+                                print(L["text"] +  " has been underlined")
+        page = None
+    doc.close()
+    return underlined
+
 
 # --- Main extraction: line-wise grouping with table detection ---
 def extract_and_group_lines(pdf_path):
@@ -66,7 +118,19 @@ def extract_and_group_lines(pdf_path):
                         )
 
                         is_link_like = bool(re.search(r"(https?://|www\.|mailto:|\.com|\.org|\|)", raw_text, re.IGNORECASE))
-                        if (is_link_like): continue
+                        is_date_like = bool(re.search(r"\b(?:\d{1,2}[-/]\d{1,2}[-/]\d{2,4}|\d{4}[-/]\d{1,2}[-/]\d{1,2})\b", raw_text))
+                        is_phone_like = bool(re.search(r"\b(?:\+?\d{1,3}[-.\s]?)?\(?\d{2,4}\)?[-.\s]?\d{3,5}[-.\s]?\d{3,5}\b", raw_text))
+                        is_email_like = bool(re.search(r"\b[\w\.-]+@[\w\.-]+\.\w+\b", raw_text))
+                        is_timestamp_like = bool(re.search(r"\b\d{1,2}:\d{2}(:\d{2})?\s*(AM|PM|am|pm)?\b", raw_text))
+                        is_page_number = bool(re.fullmatch(r"Page\s*\d+|\d+\s*/\s*\d+|\d{1,3}", raw_text.strip()))
+                        is_punct_deco = bool(re.fullmatch(r"[-=_*.•●·▪️◆■]+", raw_text.strip()))
+                        is_file_path = bool(re.search(r"\w+\.(pdf|docx?|pptx?|xls|txt|csv)", raw_text, re.IGNORECASE))
+
+                        if any([
+                            is_link_like, is_date_like, is_phone_like, is_email_like,
+                            is_timestamp_like, is_page_number, is_punct_deco, is_file_path
+                        ]):
+                            continue
 
                         # Override table flag if it's clearly a sentence and not a link
                         if in_table and (looks_like_sentence and not is_link_like):
@@ -115,6 +179,7 @@ def extract_and_group_lines(pdf_path):
                 "is_bold": any(s["is_bold"] for s in group),
                 "gap_above": round(gap, 2),
                 "y0": y0,
+                "y1": group[0]["bbox"].y1,                   # group[0]["bbox"].y1
                 "word_count": word_count,
                 "ends_in_period": int(line_text.strip().endswith(".")),
                 "is_short_line": int(word_count <= 2),
@@ -123,13 +188,13 @@ def extract_and_group_lines(pdf_path):
 
     doc.close()
 
-    # page_maxY = {}
-    # for line in all_lines:                                  # mark last lines
-    #     p, y0 = line["page"], line["y0"]
-    #     page_maxY[p] = max(page_maxY.get(p, y0), y0)
+    page_maxY = {}
+    for line in all_lines:                                  # mark last lines
+        p, y0 = line["page"], line["y0"]
+        page_maxY[p] = max(page_maxY.get(p, y0), y0)
 
-    # for line in all_lines:                                  # add is_last_line feature
-    #     line["is_last_line"] = (line["y0"] == page_maxY[line["page"]])
+    for line in all_lines:                                  # add is_last_line feature
+        line["is_last_line"] = (line["y0"] == page_maxY[line["page"]])
 
     # --- Smart header/footer removal based on text frequency, only if >=2 pages ---
     pages = {l["page"] for l in all_lines}
@@ -157,73 +222,73 @@ def extract_and_group_lines(pdf_path):
                 cleaned.append(l)
         all_lines = cleaned
     # else: single‐page PDF → skip filtering
+    return all_lines
 
 
 
     # --- Merge multiple lines that likely belong to same visual heading ---
-    if 1:
-        merged_lines = []
-        i = 0
-        while i < len(all_lines):
-            current = all_lines[i]
-            # if current['y0'] < 100 and current['page'] > 1:
-            #     i += 1
+def merge_lines_with_underline(all_lines, underlined_set):
+    merged_lines = []
+    i = 0
+    while i < len(all_lines):
+        current = all_lines[i]
+        # if current['y0'] < 100 and current['page'] > 1:
+        #     i += 1
+        #     continue
+
+        if is_noise_line(current['text']):
+            i += 1
+            continue
+        
+        combined = current.copy()
+
+        # print(combined['text'])
+
+        j = i + 1
+        while j < len(all_lines):
+            next_line = all_lines[j]
+            # if (next_line['y0']<100 and next_line['page']>1):
+            #     j+=1
             #     continue
 
-            if is_noise_line(current['text']):
-                i += 1
-                continue
-            
-            combined = current.copy()
-
-            # print(combined['text'])
-
-            j = i + 1
-            while j < len(all_lines):
-                next_line = all_lines[j]
-                # if (next_line['y0']<100 and next_line['page']>1):
-                #     j+=1
-                #     continue
-
-                if is_noise_line(next_line['text']):
-                    j += 1
-                    continue
-
-                gap = next_line['y0'] - current['y0']
-                same_page = current['page'] == next_line['page']
-                same_bold = current['is_bold'] == next_line['is_bold']
-                similar_size = abs(current['font_size'] - next_line['font_size']) < 0.5
-
-                # Allow wider gap if it's on the first page
-                max_gap = 60 if current['page'] == 1 else 20
-                # max_gap=20
-                # print(current['page'], current['text'], max_gap)
-
-                can_merge = (
-                    same_page and
-                    similar_size and
-                    same_bold and
-                    0 < gap < max_gap and
-                    current["in_table"]==next_line["in_table"]
-                )
-
-
-                if not can_merge:
-                    break
-
-                combined['text'] += ' ' + next_line['text']
-                combined['word_count'] += next_line['word_count']
-                combined['ends_in_period'] = int(next_line['text'].strip().endswith("."))
-                combined['is_short_line'] = int(combined['word_count'] <= 2)
-                combined['in_table'] = combined['in_table'] or next_line['in_table']
-                current = next_line
+            if is_noise_line(next_line['text']):
                 j += 1
-            # print(combined['text'])
-            merged_lines.append(combined)
-            i = j
+                continue
 
-        return merged_lines
-    return all_lines
+            gap = next_line['y0'] - current['y0']
+            same_page = current['page'] == next_line['page']
+            same_bold = current['is_bold'] == next_line['is_bold']
+            similar_size = abs(current['font_size'] - next_line['font_size']) < 0.5
+
+            # Allow wider gap if it's on the first page
+            max_gap = 60 if current['page'] == 1 else 20
+            # max_gap=20
+            # print(current['page'], current['text'], max_gap)
+
+            can_merge = (
+                same_page and
+                similar_size and
+                same_bold and
+                0 < gap < max_gap and
+                current["in_table"]==next_line["in_table"]
+            )
+
+
+            if not can_merge:
+                break
+
+            combined['text'] += ' ' + next_line['text']
+            combined['word_count'] += next_line['word_count']
+            combined['ends_in_period'] = int(next_line['text'].strip().endswith("."))
+            combined['is_short_line'] = int(combined['word_count'] <= 2)
+            combined['in_table'] = combined['in_table'] or next_line['in_table']
+            current = next_line
+            j += 1
+        # print(combined['text'])
+        merged_lines.append(combined)
+        i = j
+
+    return merged_lines
 
 # --- Classify Headings ---
 def classify_heading_candidates(lines):
@@ -237,7 +302,7 @@ def classify_heading_candidates(lines):
     candidates = []
 
     for line in lines:
-        if line["in_table"]:        # skip table lines and last lines of page
+        if line["in_table"] or line["is_last_line"]:        # skip table lines and last lines of page
             continue
         if line['y0'] > 615:                                # skip footers
             continue
@@ -255,16 +320,26 @@ def classify_heading_candidates(lines):
                 "text": line["text"],
                 "page": line["page"],
                 "font_size": line["font_size"],
-                "score": score
+                "is_bold": (int(line["is_bold"])),
+                "score": score,
+                "y0": line["y0"]
             })
-    print("\n=== Detected Heading Candidates ===")
+
+    unique = {}
     for c in candidates:
+        key = (c["text"], c["page"])
+        if key not in unique or c["score"] > unique[key]["score"]:
+            unique[key] = c
+    unique_candidates = list(unique.values())
+
+    print("\n=== Detected Heading Candidates ===")
+    for c in unique_candidates:
         print(f"Page {c['page']} | Size: {c['font_size']} | Score: {round(c['score'], 2)} | Text: {c['text']}")
 
-    return candidates
+    return unique_candidates
 
 # --- Cluster and Assign H1/H2/H3 ---
-def cluster_pages_and_build_outline(headings, lines):
+def cluster_pages_and_build_outline(headings, lines, underlined):
     if not headings:
         return []
 
@@ -295,13 +370,11 @@ def cluster_pages_and_build_outline(headings, lines):
     if n_pages == 1:
         seg_dict = {0: [pages[0]]}
     else:
-        from scipy import sparse
         conn = sparse.lil_matrix((n_pages, n_pages))
         for i in range(n_pages - 1):
             conn[i, i + 1] = 1
             conn[i + 1, i] = 1
 
-        from sklearn.cluster import AgglomerativeClustering
         model = AgglomerativeClustering(
             n_clusters=None,
             distance_threshold=0.4,
@@ -323,16 +396,48 @@ def cluster_pages_and_build_outline(headings, lines):
     for seg in page_segments:
         seg_sizes = sorted({h['font_size'] for p in seg for h in headings_by_page.get(p, [])}, reverse=True)
         level_map = {s: f"H{i+1}" for i, s in enumerate(seg_sizes[:3])}
+        temp = []
         for p in seg:
             for h in headings_by_page.get(p, []):
-                lvl = level_map.get(h["font_size"])
-                if lvl:
-                    outline.append({
-                        "level": lvl,
-                        "text": h["text"],
-                        "page": h["page"],
-                        "score": h["score"]
-                    })
+                lvl = level_map.get(h["font_size"], "H3")
+                temp.append({
+                "level": lvl,
+                "text":  h["text"],
+                "page":  h["page"],
+                "score": h["score"],
+                "demoted": 0,
+                "font_size": h["font_size"],
+                "is_bold":  int(h.get("is_bold",0)),
+                "underlined": int((h["page"],h["y0"]) in underlined)
+                })
+        
+        for level in ["H1","H2","H3"]:
+            bucket = [x for x in temp if x["level"] == level]
+            n = len(bucket)
+            if n > 1:
+                for i in range(n):
+                    x1 = bucket[i]
+                    for j in range(i, n):
+                        x2 = bucket[j]
+                        if x1["font_size"] == x2["font_size"] and x1["is_bold"] != x2["is_bold"]:
+                            if x1["is_bold"] and x2["demoted"] == 0:
+                                x2["level"] = f"H{min(int(level[1])+1, 3)}"         # demoted
+                                x2["demoted"] = 1
+                            elif x2["is_bold"]:
+                                x1["level"] = f"H{min(int(level[1])+1, 3)}"
+                                x1["demoted"] = 1
+                                break
+
+                        elif x1["font_size"] == x2["font_size"] and x1["underlined"] != x2["underlined"]:
+                            if x1["underlined"] and x2["demoted"] == 0:
+                                x2["level"] = f"H{min(int(level[1])+1, 3)}"
+                                x2["demoted"] = 1
+                            elif x2["underlined"]:
+                                x1["level"] = f"H{min(int(level[1])+1, 3)}"
+                                x1["demoted"] = 1
+                                break
+
+        outline.extend(temp)
                   
     return outline
 
@@ -348,7 +453,6 @@ def find_first_content_page(all_lines, min_words=1):
             return page
     return 1  # fallback if no good page is found
 
-
 # --- Final Output ---
 def get_final_outline(pdf_path):
     pdf = fitz.open(pdf_path)
@@ -356,11 +460,16 @@ def get_final_outline(pdf_path):
     pdf.close()
     page_offset = 1 if page_count > 1 else 0
 
-    all_lines = extract_and_group_lines(pdf_path)
+    all_lines_before_merge = extract_and_group_lines(pdf_path)
+    underlined = detect_underlined_lines(pdf_path, all_lines_before_merge)
+    all_lines = merge_lines_with_underline(all_lines_before_merge, underlined)
 
     # Detect Title
     first_text_page = find_first_content_page(all_lines)
     page1_lines = [l for l in all_lines if l["page"] == first_text_page and not l["in_table"]]
+    with open('output.txt', 'w', encoding='utf-8') as fout:            # DEBUGGING
+        for line in page1_lines:
+            fout.write(line['text'] + '\n')
     title = ""
     if page1_lines:
         # title is line with greatest font size. if tie, then upper line
@@ -369,7 +478,7 @@ def get_final_outline(pdf_path):
             title = best_fit_for_title["text"]
 
     headings = classify_heading_candidates(all_lines)
-    outline = cluster_pages_and_build_outline(headings, all_lines)
+    outline = cluster_pages_and_build_outline(headings, all_lines, underlined)
 
     # Filter title out
     filtered = [o for o in outline if _clean_text(o["text"]) != _clean_text(title)]
@@ -379,9 +488,11 @@ def get_final_outline(pdf_path):
     for o in sorted_outline:
         o['page'] = o['page'] - page_offset
 
+    cleaned_outline = [ {"level": o["level"], "text": o["text"], "page": o["page"]} for o in sorted_outline]
+
     return {
         "title": title,
-        "outline": sorted_outline
+        "outline": cleaned_outline
     }
 
 # --- CLI Entrypoint ---
