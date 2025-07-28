@@ -19,15 +19,20 @@ WEIGHTS = {
 }
 INTERCEPT = 1.6011
 
+# WEIGHTS = {
+#     'font_size_diff': 0.5019,
+#     'is_bold': 3.0546,
+#     'gap_above': 0.0016,
+#     'word_count': -0.4218,
+#     'ends_in_period': -2.7970,
+#     'is_short_line': -1.4046,
+# }
+# INTERCEPT = 1.7762
+
 # --- Helper: Normalize text ---
 def _clean_text(text):
     cleaned = re.sub(r'[^a-z0-9\s]', '', text.lower())
     return re.sub(r'\s+', ' ', cleaned).strip()
-
-def is_noise_line(text):
-    # Line is mostly punctuation or contains long stretches of dots
-    return bool(re.match(r"^[. \t]{5,}.*\d{1,3}$", text.strip())) or \
-           bool(re.match(r"^.*\.{5,}.*\d{1,3}$", text.strip()))
 
 # --- Main extraction: line-wise grouping with table detection ---
 def extract_and_group_lines(pdf_path):
@@ -38,7 +43,7 @@ def extract_and_group_lines(pdf_path):
         try:
             blocks = page.get_text("dict").get("blocks", [])
             tables = page.find_tables().tables
-            table_areas = [fitz.Rect(t.bbox) for t in tables]
+            table_areas = [t.bbox for t in tables]
         except Exception as e:
             print(f"Skipping page {page_num+1} due to MuPDF error: {e}")
             continue
@@ -52,28 +57,8 @@ def extract_and_group_lines(pdf_path):
                         if not text:
                             continue
                         bbox = fitz.Rect(span.get("bbox"))
-                        raw_text = span.get("text", "").strip()
-
-                        # Default: assume it's in table if intersects with any table bbox
-                        in_table = any(tb.contains(bbox) for tb in table_areas)
-
-                        # Heuristic override: looks like a sentence (likely not a table cell)
-                        looks_like_sentence = (
-                            raw_text and
-                            raw_text[0].isupper() and
-                            raw_text[-1] in ".?" and
-                            len(raw_text.split()) >= 5  # at least 5 words
-                        )
-
-                        is_link_like = bool(re.search(r"(https?://|www\.|mailto:|\.com|\.org|\|)", raw_text, re.IGNORECASE))
-                        if (is_link_like): continue
-
-                        # Override table flag if it's clearly a sentence and not a link
-                        if in_table and (looks_like_sentence and not is_link_like):
-                            in_table = False
+                        in_table = any(bbox.intersects(tb) for tb in table_areas)
                         is_bold = "bold" in span.get("font", "").lower() or span.get("flags", 0) & 2
-
-                        # if (is_bold): print(text, round(span.get("size"), 2), in_table, page_num, bbox)
 
                         spans.append({
                             'text': text,
@@ -123,106 +108,14 @@ def extract_and_group_lines(pdf_path):
 
     doc.close()
 
-    # page_maxY = {}
-    # for line in all_lines:                                  # mark last lines
-    #     p, y0 = line["page"], line["y0"]
-    #     page_maxY[p] = max(page_maxY.get(p, y0), y0)
+    page_maxY = {}
+    for line in all_lines:                                  # mark last lines
+        p, y0 = line["page"], line["y0"]
+        page_maxY[p] = max(page_maxY.get(p, y0), y0)
 
-    # for line in all_lines:                                  # add is_last_line feature
-    #     line["is_last_line"] = (line["y0"] == page_maxY[line["page"]])
+    for line in all_lines:                                  # add is_last_line feature
+        line["is_last_line"] = (line["y0"] == page_maxY[line["page"]])
 
-    # --- Smart header/footer removal based on text frequency, only if >=2 pages ---
-    pages = {l["page"] for l in all_lines}
-    if len(pages) > 2:
-        # 1) Count how often each exact line text appears (excluding page 1)
-        text_freq = Counter()
-        page_of_text = defaultdict(set)
-        for l in all_lines:
-            if l["page"] == 1:
-                continue
-            t = l["text"].strip()
-            if t:
-                text_freq[t] += 1
-                page_of_text[t].add(l["page"])
-
-        # 2) Identify “repeated” texts appearing on ≥50% of pages (page 2+)
-        num_pages = max(pages)
-        threshold = max(2, int((num_pages - 1) * 0.5))  # at least 2 occurrences
-        repeated = {t for t, cnt in text_freq.items() if cnt >= threshold}
-
-        # 3) Filter out only those lines whose text is in `repeated`
-        cleaned = []
-        for l in all_lines:
-            if l["page"] == 1 or l["text"].strip() not in repeated:
-                cleaned.append(l)
-        all_lines = cleaned
-    # else: single‐page PDF → skip filtering
-
-
-
-    # --- Merge multiple lines that likely belong to same visual heading ---
-    if 1:
-        merged_lines = []
-        i = 0
-        while i < len(all_lines):
-            current = all_lines[i]
-            # if current['y0'] < 100 and current['page'] > 1:
-            #     i += 1
-            #     continue
-
-            if is_noise_line(current['text']):
-                i += 1
-                continue
-            
-            combined = current.copy()
-
-            # print(combined['text'])
-
-            j = i + 1
-            while j < len(all_lines):
-                next_line = all_lines[j]
-                # if (next_line['y0']<100 and next_line['page']>1):
-                #     j+=1
-                #     continue
-
-                if is_noise_line(next_line['text']):
-                    j += 1
-                    continue
-
-                gap = next_line['y0'] - current['y0']
-                same_page = current['page'] == next_line['page']
-                same_bold = current['is_bold'] == next_line['is_bold']
-                similar_size = abs(current['font_size'] - next_line['font_size']) < 0.5
-
-                # Allow wider gap if it's on the first page
-                max_gap = 60 if current['page'] == 1 else 20
-                # max_gap=20
-                # print(current['page'], current['text'], max_gap)
-
-                can_merge = (
-                    same_page and
-                    similar_size and
-                    same_bold and
-                    0 < gap < max_gap and
-                    current["in_table"]==next_line["in_table"]
-                )
-
-
-                if not can_merge:
-                    break
-
-                combined['text'] += ' ' + next_line['text']
-                combined['word_count'] += next_line['word_count']
-                combined['ends_in_period'] = int(next_line['text'].strip().endswith("."))
-                combined['is_short_line'] = int(combined['word_count'] <= 2)
-                combined['in_table'] = combined['in_table'] or next_line['in_table']
-                current = next_line
-                j += 1
-            # print(combined['text'])
-            merged_lines.append(combined)
-            i = j
-
-        return merged_lines
     return all_lines
 
 # --- Classify Headings ---
@@ -237,9 +130,9 @@ def classify_heading_candidates(lines):
     candidates = []
 
     for line in lines:
-        if line["in_table"]:        # skip table lines and last lines of page
+        if line["in_table"] or line["is_last_line"]:        # skip table lines and last lines of page
             continue
-        if line['y0'] > 615:                                # skip footers
+        if line['y0'] > 600:                                # skip footers
             continue
         features = {
             'font_size_diff': line["font_size"] - body_size,
@@ -257,10 +150,6 @@ def classify_heading_candidates(lines):
                 "font_size": line["font_size"],
                 "score": score
             })
-    print("\n=== Detected Heading Candidates ===")
-    for c in candidates:
-        print(f"Page {c['page']} | Size: {c['font_size']} | Score: {round(c['score'], 2)} | Text: {c['text']}")
-
     return candidates
 
 # --- Cluster and Assign H1/H2/H3 ---
@@ -333,24 +222,11 @@ def cluster_pages_and_build_outline(headings, lines):
                         "page": h["page"],
                         "score": h["score"]
                     })
-                  
     return outline
-
-def find_first_content_page(all_lines, min_words=1):
-    page_word_counts = defaultdict(int)
-    for line in all_lines:
-        if not is_noise_line(line["text"]):
-            page_word_counts[line["page"]] += len(line["text"].split())
-
-    # Sort by page number and return the first with enough words
-    for page in sorted(page_word_counts):
-        if page_word_counts[page] >= min_words:
-            return page
-    return 1  # fallback if no good page is found
 
 
 # --- Final Output ---
-def get_final_outline(pdf_path):
+def get_final_outline(pdf_path, return_all_lines=False):
     pdf = fitz.open(pdf_path)
     page_count = pdf.page_count
     pdf.close()
@@ -359,12 +235,10 @@ def get_final_outline(pdf_path):
     all_lines = extract_and_group_lines(pdf_path)
 
     # Detect Title
-    first_text_page = find_first_content_page(all_lines)
-    page1_lines = [l for l in all_lines if l["page"] == first_text_page and not l["in_table"]]
+    page1_lines = [l for l in all_lines if l["page"] == 1 and not l["in_table"]]
     title = ""
     if page1_lines:
-        # title is line with greatest font size. if tie, then upper line
-        best_fit_for_title = max(page1_lines, key = lambda L: (L["font_size"], -L["y0"]))
+        best_fit_for_title = max(page1_lines, key=lambda L: (L["font_size"], -L["y0"]))
         if best_fit_for_title["y0"] < 550:
             title = best_fit_for_title["text"]
 
@@ -375,14 +249,18 @@ def get_final_outline(pdf_path):
     filtered = [o for o in outline if _clean_text(o["text"]) != _clean_text(title)]
     sorted_outline = sorted(filtered, key=lambda x: x["page"])
 
-    # taking care of page indexing
+    # Adjust page numbers
     for o in sorted_outline:
         o['page'] = o['page'] - page_offset
+
+    if return_all_lines:
+        return title, sorted_outline, all_lines
 
     return {
         "title": title,
         "outline": sorted_outline
     }
+
 
 # --- CLI Entrypoint ---
 if __name__ == '__main__':
