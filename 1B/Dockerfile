@@ -8,16 +8,11 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir sentence-transformers torch
-
+COPY requirements.txt . 
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+RUN pip install --no-cache-dir -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
 
 COPY src/ ./src
 COPY models/ ./models/
-
-
-
 
 ENTRYPOINT ["python", "src/main.py", "--input_dir", "/app/input", "--output_dir", "/app/output"]
