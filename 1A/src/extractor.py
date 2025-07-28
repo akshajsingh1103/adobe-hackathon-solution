@@ -118,7 +118,19 @@ def extract_and_group_lines(pdf_path):
                         )
 
                         is_link_like = bool(re.search(r"(https?://|www\.|mailto:|\.com|\.org|\|)", raw_text, re.IGNORECASE))
-                        if (is_link_like): continue
+                        is_date_like = bool(re.search(r"\b(?:\d{1,2}[-/]\d{1,2}[-/]\d{2,4}|\d{4}[-/]\d{1,2}[-/]\d{1,2})\b", raw_text))
+                        is_phone_like = bool(re.search(r"\b(?:\+?\d{1,3}[-.\s]?)?\(?\d{2,4}\)?[-.\s]?\d{3,5}[-.\s]?\d{3,5}\b", raw_text))
+                        is_email_like = bool(re.search(r"\b[\w\.-]+@[\w\.-]+\.\w+\b", raw_text))
+                        is_timestamp_like = bool(re.search(r"\b\d{1,2}:\d{2}(:\d{2})?\s*(AM|PM|am|pm)?\b", raw_text))
+                        is_page_number = bool(re.fullmatch(r"Page\s*\d+|\d+\s*/\s*\d+|\d{1,3}", raw_text.strip()))
+                        is_punct_deco = bool(re.fullmatch(r"[-=_*.•●·▪️◆■]+", raw_text.strip()))
+                        is_file_path = bool(re.search(r"\w+\.(pdf|docx?|pptx?|xls|txt|csv)", raw_text, re.IGNORECASE))
+
+                        if any([
+                            is_link_like, is_date_like, is_phone_like, is_email_like,
+                            is_timestamp_like, is_page_number, is_punct_deco, is_file_path
+                        ]):
+                            continue
 
                         # Override table flag if it's clearly a sentence and not a link
                         if in_table and (looks_like_sentence and not is_link_like):
@@ -247,8 +259,6 @@ def merge_lines_with_underline(all_lines, underlined_set):
             same_page = current['page'] == next_line['page']
             same_bold = current['is_bold'] == next_line['is_bold']
             similar_size = abs(current['font_size'] - next_line['font_size']) < 0.5
-            same_underline = ((current['page'], current['y0']) in underlined_set) == \
-                 ((next_line['page'], next_line['y0']) in underlined_set)
 
             # Allow wider gap if it's on the first page
             max_gap = 60 if current['page'] == 1 else 20
@@ -260,8 +270,7 @@ def merge_lines_with_underline(all_lines, underlined_set):
                 similar_size and
                 same_bold and
                 0 < gap < max_gap and
-                current["in_table"]==next_line["in_table"] and
-                same_underline
+                current["in_table"]==next_line["in_table"]
             )
 
 
@@ -315,11 +324,19 @@ def classify_heading_candidates(lines):
                 "score": score,
                 "y0": line["y0"]
             })
-    print("\n=== Detected Heading Candidates ===")
+
+    unique = {}
     for c in candidates:
+        key = (c["text"], c["page"])
+        if key not in unique or c["score"] > unique[key]["score"]:
+            unique[key] = c
+    unique_candidates = list(unique.values())
+
+    print("\n=== Detected Heading Candidates ===")
+    for c in unique_candidates:
         print(f"Page {c['page']} | Size: {c['font_size']} | Score: {round(c['score'], 2)} | Text: {c['text']}")
 
-    return candidates
+    return unique_candidates
 
 # --- Cluster and Assign H1/H2/H3 ---
 def cluster_pages_and_build_outline(headings, lines, underlined):
@@ -377,43 +394,50 @@ def cluster_pages_and_build_outline(headings, lines, underlined):
         headings_by_page[h['page']].append(h)
 
     for seg in page_segments:
-        # collect all headings in this segment
-        seg_heads = [h for p in seg for h in headings_by_page.get(p, [])]
-        # attach underline flag
-        for h in seg_heads:
-            h["_underlined"] = int((h["page"], h["y0"]) in underlined)
-
-        # sort by font_size, bold, then underline as tiebreak
-        seg_heads.sort(key=lambda h: (
-            h["font_size"],
-            int(h.get("is_bold", 0)),
-            h["_underlined"]
-        ), reverse=True)
-
-        # pick distinct (font_size, bold) groups in that order
-        seen = set()
-        top_groups = []
-        for h in seg_heads:
-            grp = (h["font_size"], int(h.get("is_bold",0)), h["_underlined"])
-            if grp not in seen:
-                seen.add(grp)
-                top_groups.append(grp)
-            if len(top_groups) == 3:
-                break
-
-        # map the top 3 groups to H1,H2,H3
-        level_map = {grp: f"H{i+1}" for i, grp in enumerate(top_groups)}
-
-        # emit
-        for h in seg_heads:
-            group = (h["font_size"], int(h["is_bold"]), h["_underlined"])
-            lvl = level_map.get(group, "H3")
-            outline.append({
+        seg_sizes = sorted({h['font_size'] for p in seg for h in headings_by_page.get(p, [])}, reverse=True)
+        level_map = {s: f"H{i+1}" for i, s in enumerate(seg_sizes[:3])}
+        temp = []
+        for p in seg:
+            for h in headings_by_page.get(p, []):
+                lvl = level_map.get(h["font_size"], "H3")
+                temp.append({
                 "level": lvl,
-                "text": h["text"],
-                "page": h["page"],
-                "score": h.get("score")
-            })
+                "text":  h["text"],
+                "page":  h["page"],
+                "score": h["score"],
+                "demoted": 0,
+                "font_size": h["font_size"],
+                "is_bold":  int(h.get("is_bold",0)),
+                "underlined": int((h["page"],h["y0"]) in underlined)
+                })
+        
+        for level in ["H1","H2","H3"]:
+            bucket = [x for x in temp if x["level"] == level]
+            n = len(bucket)
+            if n > 1:
+                for i in range(n):
+                    x1 = bucket[i]
+                    for j in range(i, n):
+                        x2 = bucket[j]
+                        if x1["font_size"] == x2["font_size"] and x1["is_bold"] != x2["is_bold"]:
+                            if x1["is_bold"] and x2["demoted"] == 0:
+                                x2["level"] = f"H{min(int(level[1])+1, 3)}"         # demoted
+                                x2["demoted"] = 1
+                            elif x2["is_bold"]:
+                                x1["level"] = f"H{min(int(level[1])+1, 3)}"
+                                x1["demoted"] = 1
+                                break
+
+                        elif x1["font_size"] == x2["font_size"] and x1["underlined"] != x2["underlined"]:
+                            if x1["underlined"] and x2["demoted"] == 0:
+                                x2["level"] = f"H{min(int(level[1])+1, 3)}"
+                                x2["demoted"] = 1
+                            elif x2["underlined"]:
+                                x1["level"] = f"H{min(int(level[1])+1, 3)}"
+                                x1["demoted"] = 1
+                                break
+
+        outline.extend(temp)
                   
     return outline
 
@@ -464,9 +488,11 @@ def get_final_outline(pdf_path):
     for o in sorted_outline:
         o['page'] = o['page'] - page_offset
 
+    cleaned_outline = [ {"level": o["level"], "text": o["text"], "page": o["page"]} for o in sorted_outline]
+
     return {
         "title": title,
-        "outline": sorted_outline
+        "outline": cleaned_outline
     }
 
 # --- CLI Entrypoint ---
