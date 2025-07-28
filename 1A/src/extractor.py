@@ -195,11 +195,19 @@ def classify_heading_candidates(lines):
                 "score": score,
                 "y0": line["y0"]
             })
-    print("\n=== Detected Heading Candidates ===")
+
+    unique = {}
     for c in candidates:
+        key = (c["text"], c["page"])
+        if key not in unique or c["score"] > unique[key]["score"]:
+            unique[key] = c
+    unique_candidates = list(unique.values())
+
+    print("\n=== Detected Heading Candidates ===")
+    for c in unique_candidates:
         print(f"Page {c['page']} | Size: {c['font_size']} | Score: {round(c['score'], 2)} | Text: {c['text']}")
 
-    return candidates
+    return unique_candidates
 
 # --- Cluster and Assign H1/H2/H3 ---
 def cluster_pages_and_build_outline(headings, lines, underlined):
@@ -258,42 +266,87 @@ def cluster_pages_and_build_outline(headings, lines, underlined):
 
     for seg in page_segments:
         # collect all headings in this segment
-        seg_heads = [h for p in seg for h in headings_by_page.get(p, [])]
-        # attach underline flag
-        for h in seg_heads:
-            h["_underlined"] = int((h["page"], h["y0"]) in underlined)
+        # seg_heads = [h for p in seg for h in headings_by_page.get(p, [])]
+        # # attach underline flag
+        # for h in seg_heads:
+        #     h["_underlined"] = int((h["page"], h["y0"]) in underlined)
 
-        # sort by font_size, bold, then underline as tiebreak
-        seg_heads.sort(key=lambda h: (
-            h["font_size"],
-            int(h.get("is_bold", 0)),
-            h["_underlined"]
-        ), reverse=True)
+        # # sort by font_size, bold, then underline as tiebreak
+        # seg_heads.sort(key=lambda h: (
+        #     h["font_size"],
+        #     int(h.get("is_bold", 0)),
+        #     h["_underlined"]
+        # ), reverse=True)
 
-        # pick distinct (font_size, bold) groups in that order
-        seen = set()
-        top_groups = []
-        for h in seg_heads:
-            grp = (h["font_size"], int(h.get("is_bold",0)), h["_underlined"])
-            if grp not in seen:
-                seen.add(grp)
-                top_groups.append(grp)
-            if len(top_groups) == 3:
-                break
+        # # pick distinct (font_size, bold) groups in that order
+        # seen = set()
+        # top_groups = []
+        # for h in seg_heads:
+        #     grp = (h["font_size"], int(h.get("is_bold",0)), h["_underlined"])
+        #     if grp not in seen:
+        #         seen.add(grp)
+        #         top_groups.append(grp)
+        #     if len(top_groups) == 3:
+        #         break
 
-        # map the top 3 groups to H1,H2,H3
-        level_map = {grp: f"H{i+1}" for i, grp in enumerate(top_groups)}
+        # # map the top 3 groups to H1,H2,H3
+        # level_map = {grp: f"H{i+1}" for i, grp in enumerate(top_groups)}
 
-        # emit
-        for h in seg_heads:
-            group = (h["font_size"], int(h["is_bold"]), h["_underlined"])
-            lvl = level_map.get(group, "H3")
-            outline.append({
+        # # emit
+        # for h in seg_heads:
+        #     group = (h["font_size"], int(h["is_bold"]), h["_underlined"])
+        #     lvl = level_map.get(group, "H3")
+        #     outline.append({
+        #         "level": lvl,
+        #         "text": h["text"],
+        #         "page": h["page"],
+        #         "score": h.get("score")
+        #     })
+
+        seg_sizes = sorted({h['font_size'] for p in seg for h in headings_by_page.get(p, [])}, reverse=True)
+        level_map = {s: f"H{i+1}" for i, s in enumerate(seg_sizes[:3])}
+        temp = []
+        for p in seg:
+            for h in headings_by_page.get(p, []):
+                lvl = level_map.get(h["font_size"], "H3")
+                temp.append({
                 "level": lvl,
-                "text": h["text"],
-                "page": h["page"],
-                "score": h.get("score")
-            })
+                "text":  h["text"],
+                "page":  h["page"],
+                "score": h["score"],
+                "demoted": 0,
+                "font_size": h["font_size"],
+                "is_bold":  int(h.get("is_bold",0)),
+                "underlined": int((h["page"],h["y0"]) in underlined)
+                })
+        
+        for level in ["H1","H2","H3"]:
+            bucket = [x for x in temp if x["level"] == level]
+            n = len(bucket)
+            if n > 1:
+                for i in range(n):
+                    x1 = bucket[i]
+                    for j in range(i, n):
+                        x2 = bucket[j]
+                        if x1["font_size"] == x2["font_size"] and x1["is_bold"] != x2["is_bold"]:
+                            if x1["is_bold"] and x2["demoted"] == 0:
+                                x2["level"] = f"H{min(int(level[1])+1, 3)}"         # demoted
+                                x2["demoted"] = 1
+                            elif x2["is_bold"]:
+                                x1["level"] = f"H{min(int(level[1])+1, 3)}"
+                                x1["demoted"] = 1
+                                break
+
+                        elif x1["font_size"] == x2["font_size"] and x1["underlined"] != x2["underlined"]:
+                            if x1["underlined"] and x2["demoted"] == 0:
+                                x2["level"] = f"H{min(int(level[1])+1, 3)}"
+                                x2["demoted"] = 1
+                            elif x2["underlined"]:
+                                x1["level"] = f"H{min(int(level[1])+1, 3)}"
+                                x1["demoted"] = 1
+                                break
+
+            outline.extend(bucket)
                   
     return outline
 
@@ -331,9 +384,11 @@ def get_final_outline(pdf_path):
     for o in sorted_outline:
         o['page'] = o['page'] - page_offset
 
+    cleaned_outline = [ {"level": o["level"], "text": o["text"], "page": o["page"]} for o in sorted_outline]
+
     return {
         "title": title,
-        "outline": sorted_outline
+        "outline": cleaned_outline
     }
 
 # --- CLI Entrypoint ---

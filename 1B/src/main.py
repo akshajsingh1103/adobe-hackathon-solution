@@ -3,13 +3,13 @@ import os
 import datetime
 import re
 import sys
-import io
+# import io
 import argparse
 import math
 from sentence_transformers import SentenceTransformer, util
 
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-# sys.stdout = open("debug_log.txt", "w", encoding="utf-8")  # Redirects all prints
+# sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+sys.stdout = open("debug_log.txt", "w", encoding="utf-8")  # Redirects all prints
 
 
 # This tells Python to also look for files in the current script's directory (src)

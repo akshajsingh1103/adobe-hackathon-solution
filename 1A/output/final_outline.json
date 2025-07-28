@@ -1,167 +1,161 @@
 {
-    "title": "Ultimate Guide to Activities and Things to Do in the South of France",
+    "title": "Overview",
     "outline": [
         {
             "level": "H1",
-            "text": "Introduction",
+            "text": "Foundation Level Extensions",
             "page": 0,
-            "score": 2.97482
-        },
-        {
-            "level": "H1",
-            "text": "Coastal Adventures",
-            "page": 1,
-            "score": 2.5048
+            "score": 11.758260000000002
         },
         {
             "level": "H2",
-            "text": "Beach Hopping",
-            "page": 1,
-            "score": 2.58004
+            "text": "International Software Testing Qualifications Board",
+            "page": 0,
+            "score": 4.5210099999999995
+        },
+        {
+            "level": "H3",
+            "text": "Version 1.0",
+            "page": 0,
+            "score": 1.0284699999999996
         },
         {
             "level": "H2",
-            "text": "Water Sports",
-            "page": 1,
-            "score": 2.58004
-        },
-        {
-            "level": "H1",
-            "text": "Cultural Experiences",
+            "text": "Revision History",
             "page": 2,
-            "score": 2.5048
+            "score": 6.11161
         },
         {
             "level": "H2",
-            "text": "Art and Museums",
-            "page": 2,
-            "score": 3.55974
+            "text": "Table of Contents",
+            "page": 3,
+            "score": 7.09131
         },
         {
-            "level": "H2",
-            "text": "Historical Sites",
-            "page": 2,
-            "score": 2.58004
+            "level": "H3",
+            "text": ".......................................................................................................................................... Revision History 3",
+            "page": 3,
+            "score": 3.19727
+        },
+        {
+            "level": "H3",
+            "text": "........................................................................................................................................ Table of Contents 4",
+            "page": 3,
+            "score": 2.7475
+        },
+        {
+            "level": "H3",
+            "text": "............................................................................ 1. Introduction to the Foundation Level Extensions 6",
+            "page": 3,
+            "score": 1.1694600000000002
+        },
+        {
+            "level": "H3",
+            "text": ".......................................................................................................................................... 4. References 12",
+            "page": 3,
+            "score": 3.1421
+        },
+        {
+            "level": "H3",
+            "text": "Acknowledgements",
+            "page": 4,
+            "score": 3.4390099999999997
         },
         {
             "level": "H1",
-            "text": "Outdoor Activities",
-            "page": 3,
-            "score": 2.5048
-        },
-        {
-            "level": "H2",
-            "text": "Hiking and Biking",
-            "page": 3,
-            "score": 3.55974
-        },
-        {
-            "level": "H2",
-            "text": "Water Activities",
-            "page": 3,
-            "score": 2.5804
-        },
-        {
-            "level": "H1",
-            "text": "Culinary Delights",
-            "page": 4,
-            "score": 2.5048
-        },
-        {
-            "level": "H2",
-            "text": "Wine Tasting",
-            "page": 4,
-            "score": 2.58004
-        },
-        {
-            "level": "H2",
-            "text": "Cooking Classes",
-            "page": 4,
-            "score": 2.58004
-        },
-        {
-            "level": "H1",
-            "text": "Festivals and Events",
+            "text": "1. Introduction to the Foundation Level Extensions",
             "page": 5,
-            "score": 3.4845
+            "score": 5.5550299999999995
         },
         {
             "level": "H1",
-            "text": "Relaxation and Wellness",
+            "text": "2. Introduction to Foundation Level Agile Tester Extension",
             "page": 6,
-            "score": 3.4845
+            "score": 5.16043
         },
         {
-            "level": "H2",
-            "text": "Spa and Wellness Retreats",
+            "level": "H3",
+            "text": "2.1 Intended Audience",
             "page": 6,
-            "score": 3.16514
+            "score": 2.848769999999999
         },
         {
-            "level": "H2",
-            "text": "Yoga and Meditation Retreats",
+            "level": "H3",
+            "text": "2.2 Career Paths for Testers",
             "page": 6,
-            "score": 3.1655
+            "score": 2.094039999999999
         },
         {
-            "level": "H1",
-            "text": "Shopping and Markets",
+            "level": "H3",
+            "text": "2.3 Learning Objectives",
+            "page": 6,
+            "score": 2.883329999999999
+        },
+        {
+            "level": "H3",
+            "text": "2.4 Entry Requirements",
             "page": 7,
-            "score": 3.4845
+            "score": 2.848799999999999
         },
         {
-            "level": "H2",
-            "text": "Local Markets",
+            "level": "H3",
+            "text": "2.5 Structure and Course Duration",
             "page": 7,
-            "score": 2.58004
+            "score": 2.0595999999999988
         },
         {
-            "level": "H2",
-            "text": "Boutique Shopping",
-            "page": 7,
-            "score": 2.5804
+            "level": "H3",
+            "text": "2.6 Keeping It Current",
+            "page": 8,
+            "score": 2.595769999999999
         },
         {
             "level": "H1",
-            "text": "Family-Friendly Activities",
-            "page": 8,
-            "score": 2.5048
+            "text": "Syllabus",
+            "page": 9,
+            "score": 6.41984
         },
         {
             "level": "H2",
-            "text": "Theme Parks and Attractions",
-            "page": 8,
-            "score": 3.16514
+            "text": "3. Overview of the Foundation Level Extension – Agile Tester",
+            "page": 9,
+            "score": 4.36187
         },
         {
-            "level": "H2",
-            "text": "Outdoor Adventures",
-            "page": 8,
-            "score": 2.5802199999999997
+            "level": "H3",
+            "text": "3.1 Business Outcomes",
+            "page": 9,
+            "score": 2.922359999999999
+        },
+        {
+            "level": "H3",
+            "text": "3.2 Content",
+            "page": 9,
+            "score": 1.9036599999999986
         },
         {
             "level": "H1",
-            "text": "Nightlife and Entertainment",
-            "page": 10,
-            "score": 3.4845
+            "text": "4. References",
+            "page": 11,
+            "score": 6.1537299999999995
         },
         {
-            "level": "H2",
-            "text": "Bars and Lounges",
-            "page": 10,
-            "score": 3.55974
+            "level": "H3",
+            "text": "4.1 Trademarks",
+            "page": 11,
+            "score": 1.9390599999999987
         },
         {
-            "level": "H2",
-            "text": "Nightclubs",
-            "page": 10,
-            "score": 2.97482
+            "level": "H3",
+            "text": "4.2 Documents and Web Sites",
+            "page": 11,
+            "score": 2.0995899999999987
         },
         {
-            "level": "H1",
-            "text": "Conclusion",
-            "page": 12,
-            "score": 2.8994
+            "level": "H3",
+            "text": "Identifier Reference",
+            "page": 11,
+            "score": 2.57491
         }
     ]
 }
