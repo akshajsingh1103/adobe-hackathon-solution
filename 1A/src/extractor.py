@@ -66,7 +66,7 @@ def detect_underlined_lines(pdf_path, lines):
                         for L in page_lines:
                             if 0 < abs(y0 - L["y1"]) < (L["font_size"]*0.3):
                                 underlined.add((L["page"], L["y0"]))
-                                print(L["text"] +  " has been underlined")
+                                # print(L["text"] +  " has been underlined")
                 elif op == "re":                                # rectangle operator
                     x, y_top, w, y = item[1]
                     h = y - y_top
@@ -75,7 +75,7 @@ def detect_underlined_lines(pdf_path, lines):
                         for L in page_lines:
                             if 0 <= abs(L["y1"] - y_top) < (L["font_size"]*0.3):
                                 underlined.add((L["page"], L["y0"]))
-                                print(L["text"] +  " has been underlined")
+                                # print(L["text"] +  " has been underlined")
         page = None
     doc.close()
     return underlined
@@ -332,9 +332,9 @@ def classify_heading_candidates(lines):
             unique[key] = c
     unique_candidates = list(unique.values())
 
-    print("\n=== Detected Heading Candidates ===")
-    for c in unique_candidates:
-        print(f"Page {c['page']} | Size: {c['font_size']} | Score: {round(c['score'], 2)} | Text: {c['text']}")
+    # print("\n=== Detected Heading Candidates ===")
+    # for c in unique_candidates:
+    #     print(f"Page {c['page']} | Size: {c['font_size']} | Score: {round(c['score'], 2)} | Text: {c['text']}")
 
     return unique_candidates
 
@@ -496,15 +496,30 @@ def get_final_outline(pdf_path):
     }
 
 # --- CLI Entrypoint ---
+# if __name__ == '__main__':
+#     parser = argparse.ArgumentParser(description="Extract structured outline from PDF.")
+#     parser.add_argument('--input', required=True, help='Input PDF path')
+#     parser.add_argument('--output', required=True, help='Output JSON path')
+#     args = parser.parse_args()
+
+#     result = get_final_outline(args.input)
+
+#     with open(args.output, 'w', encoding='utf-8') as f:
+#         json.dump(result, f, indent=4, ensure_ascii=False)
+
+#     # print(f"Extracted outline written to {args.output}")
+
+
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Extract structured outline from PDF.")
-    parser.add_argument('--input', required=True, help='Input PDF path')
-    parser.add_argument('--output', required=True, help='Output JSON path')
-    args = parser.parse_args()
+    input_dir = Path("/app/input")
+    output_dir = Path("/app/output")
 
-    result = get_final_outline(args.input)
-
-    with open(args.output, 'w', encoding='utf-8') as f:
-        json.dump(result, f, indent=4, ensure_ascii=False)
-
-    print(f"Extracted outline written to {args.output}")
+    for pdf_path in input_dir.glob("*.pdf"):
+        try:
+            result = get_final_outline(str(pdf_path))
+            output_path = output_dir / (pdf_path.stem + ".json")
+            with open(output_path, 'w', encoding='utf-8') as f:
+                json.dump(result, f, indent=4, ensure_ascii=False)
+            print(f"Processed {pdf_path.name} -> {output_path.name}")
+        except Exception as e:
+            print(f"Error processing {pdf_path.name}: {e}")
