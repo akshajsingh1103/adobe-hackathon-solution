@@ -29,6 +29,8 @@ INTERCEPT = 1.6011
 # }
 # INTERCEPT = 1.7762
 
+#final version
+
 # --- Helper: Normalize text ---
 def _clean_text(text):
     cleaned = re.sub(r'[^a-z0-9\s]', '', text.lower())
