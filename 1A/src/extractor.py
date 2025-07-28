@@ -19,6 +19,16 @@ WEIGHTS = {
 }
 INTERCEPT = 1.6011
 
+# WEIGHTS = {
+#     'font_size_diff': 0.5019,
+#     'is_bold': 3.0546,
+#     'gap_above': 0.0016,
+#     'word_count': -0.4218,
+#     'ends_in_period': -2.7970,
+#     'is_short_line': -1.4046,
+# }
+# INTERCEPT = 1.7762
+
 # --- Helper: Normalize text ---
 def _clean_text(text):
     cleaned = re.sub(r'[^a-z0-9\s]', '', text.lower())
@@ -28,6 +38,48 @@ def is_noise_line(text):
     # Line is mostly punctuation or contains long stretches of dots
     return bool(re.match(r"^[. \t]{5,}.*\d{1,3}$", text.strip())) or \
            bool(re.match(r"^.*\.{5,}.*\d{1,3}$", text.strip()))
+
+# Detect underlined lines
+def detect_underlined_lines(pdf_path, lines):
+    """
+    Scan each page's drawing objects for horizontal lines immediately beneath text.
+    return a set of (page, y0).
+    """
+    doc = fitz.open(pdf_path)
+    underlined = set()
+    # Group lines by page for faster lookup
+    by_page = {}
+    for L in lines:
+        by_page.setdefault(L["page"], []).append(L)
+
+    for page_num, page_lines in by_page.items():
+        page = doc.load_page(page_num-1)
+        # collect all horizontal segments
+        draws = page.get_drawings()
+        for d in draws:
+            for item in d["items"]:
+                op = item[0]
+                if op == "l":                                   # line
+                    (x0, y0), (x1, y1) = item[1], item[2]
+                    if abs(y1 - y0) < 1.0:  # horizontal
+                        # any line whose text-y0 is just above this
+                        for L in page_lines:
+                            if 0 < abs(y0 - L["y1"]) < (L["font_size"]*0.3):
+                                underlined.add((L["page"], L["y0"]))
+                                print(L["text"] +  " has been underlined")
+                elif op == "re":                                # rectangle operator
+                    x, y_top, w, y = item[1]
+                    h = y - y_top
+                    if h >= 0 and h < 2:                     # very short height, likely underline       
+                        # rectangle’s top edge is at y+h
+                        for L in page_lines:
+                            if 0 <= abs(L["y1"] - y_top) < (L["font_size"]*0.3):
+                                underlined.add((L["page"], L["y0"]))
+                                print(L["text"] +  " has been underlined")
+        page = None
+    doc.close()
+    return underlined
+
 
 # --- Main extraction: line-wise grouping with table detection ---
 def extract_and_group_lines(pdf_path):
@@ -115,6 +167,7 @@ def extract_and_group_lines(pdf_path):
                 "is_bold": any(s["is_bold"] for s in group),
                 "gap_above": round(gap, 2),
                 "y0": y0,
+                "y1": group[0]["bbox"].y1,                   # group[0]["bbox"].y1
                 "word_count": word_count,
                 "ends_in_period": int(line_text.strip().endswith(".")),
                 "is_short_line": int(word_count <= 2),
@@ -123,13 +176,13 @@ def extract_and_group_lines(pdf_path):
 
     doc.close()
 
-    # page_maxY = {}
-    # for line in all_lines:                                  # mark last lines
-    #     p, y0 = line["page"], line["y0"]
-    #     page_maxY[p] = max(page_maxY.get(p, y0), y0)
+    page_maxY = {}
+    for line in all_lines:                                  # mark last lines
+        p, y0 = line["page"], line["y0"]
+        page_maxY[p] = max(page_maxY.get(p, y0), y0)
 
-    # for line in all_lines:                                  # add is_last_line feature
-    #     line["is_last_line"] = (line["y0"] == page_maxY[line["page"]])
+    for line in all_lines:                                  # add is_last_line feature
+        line["is_last_line"] = (line["y0"] == page_maxY[line["page"]])
 
     # --- Smart header/footer removal based on text frequency, only if >=2 pages ---
     pages = {l["page"] for l in all_lines}
@@ -157,73 +210,76 @@ def extract_and_group_lines(pdf_path):
                 cleaned.append(l)
         all_lines = cleaned
     # else: single‐page PDF → skip filtering
+    return all_lines
 
 
 
     # --- Merge multiple lines that likely belong to same visual heading ---
-    if 1:
-        merged_lines = []
-        i = 0
-        while i < len(all_lines):
-            current = all_lines[i]
-            # if current['y0'] < 100 and current['page'] > 1:
-            #     i += 1
+def merge_lines_with_underline(all_lines, underlined_set):
+    merged_lines = []
+    i = 0
+    while i < len(all_lines):
+        current = all_lines[i]
+        # if current['y0'] < 100 and current['page'] > 1:
+        #     i += 1
+        #     continue
+
+        if is_noise_line(current['text']):
+            i += 1
+            continue
+        
+        combined = current.copy()
+
+        # print(combined['text'])
+
+        j = i + 1
+        while j < len(all_lines):
+            next_line = all_lines[j]
+            # if (next_line['y0']<100 and next_line['page']>1):
+            #     j+=1
             #     continue
 
-            if is_noise_line(current['text']):
-                i += 1
-                continue
-            
-            combined = current.copy()
-
-            # print(combined['text'])
-
-            j = i + 1
-            while j < len(all_lines):
-                next_line = all_lines[j]
-                # if (next_line['y0']<100 and next_line['page']>1):
-                #     j+=1
-                #     continue
-
-                if is_noise_line(next_line['text']):
-                    j += 1
-                    continue
-
-                gap = next_line['y0'] - current['y0']
-                same_page = current['page'] == next_line['page']
-                same_bold = current['is_bold'] == next_line['is_bold']
-                similar_size = abs(current['font_size'] - next_line['font_size']) < 0.5
-
-                # Allow wider gap if it's on the first page
-                max_gap = 60 if current['page'] == 1 else 20
-                # max_gap=20
-                # print(current['page'], current['text'], max_gap)
-
-                can_merge = (
-                    same_page and
-                    similar_size and
-                    same_bold and
-                    0 < gap < max_gap and
-                    current["in_table"]==next_line["in_table"]
-                )
-
-
-                if not can_merge:
-                    break
-
-                combined['text'] += ' ' + next_line['text']
-                combined['word_count'] += next_line['word_count']
-                combined['ends_in_period'] = int(next_line['text'].strip().endswith("."))
-                combined['is_short_line'] = int(combined['word_count'] <= 2)
-                combined['in_table'] = combined['in_table'] or next_line['in_table']
-                current = next_line
+            if is_noise_line(next_line['text']):
                 j += 1
-            # print(combined['text'])
-            merged_lines.append(combined)
-            i = j
+                continue
 
-        return merged_lines
-    return all_lines
+            gap = next_line['y0'] - current['y0']
+            same_page = current['page'] == next_line['page']
+            same_bold = current['is_bold'] == next_line['is_bold']
+            similar_size = abs(current['font_size'] - next_line['font_size']) < 0.5
+            same_underline = ((current['page'], current['y0']) in underlined_set) == \
+                 ((next_line['page'], next_line['y0']) in underlined_set)
+
+            # Allow wider gap if it's on the first page
+            max_gap = 60 if current['page'] == 1 else 20
+            # max_gap=20
+            # print(current['page'], current['text'], max_gap)
+
+            can_merge = (
+                same_page and
+                similar_size and
+                same_bold and
+                0 < gap < max_gap and
+                current["in_table"]==next_line["in_table"] and
+                same_underline
+            )
+
+
+            if not can_merge:
+                break
+
+            combined['text'] += ' ' + next_line['text']
+            combined['word_count'] += next_line['word_count']
+            combined['ends_in_period'] = int(next_line['text'].strip().endswith("."))
+            combined['is_short_line'] = int(combined['word_count'] <= 2)
+            combined['in_table'] = combined['in_table'] or next_line['in_table']
+            current = next_line
+            j += 1
+        # print(combined['text'])
+        merged_lines.append(combined)
+        i = j
+
+    return merged_lines
 
 # --- Classify Headings ---
 def classify_heading_candidates(lines):
@@ -237,7 +293,7 @@ def classify_heading_candidates(lines):
     candidates = []
 
     for line in lines:
-        if line["in_table"]:        # skip table lines and last lines of page
+        if line["in_table"] or line["is_last_line"]:        # skip table lines and last lines of page
             continue
         if line['y0'] > 615:                                # skip footers
             continue
@@ -255,7 +311,9 @@ def classify_heading_candidates(lines):
                 "text": line["text"],
                 "page": line["page"],
                 "font_size": line["font_size"],
-                "score": score
+                "is_bold": (int(line["is_bold"])),
+                "score": score,
+                "y0": line["y0"]
             })
     print("\n=== Detected Heading Candidates ===")
     for c in candidates:
@@ -264,7 +322,7 @@ def classify_heading_candidates(lines):
     return candidates
 
 # --- Cluster and Assign H1/H2/H3 ---
-def cluster_pages_and_build_outline(headings, lines):
+def cluster_pages_and_build_outline(headings, lines, underlined):
     if not headings:
         return []
 
@@ -295,13 +353,11 @@ def cluster_pages_and_build_outline(headings, lines):
     if n_pages == 1:
         seg_dict = {0: [pages[0]]}
     else:
-        from scipy import sparse
         conn = sparse.lil_matrix((n_pages, n_pages))
         for i in range(n_pages - 1):
             conn[i, i + 1] = 1
             conn[i + 1, i] = 1
 
-        from sklearn.cluster import AgglomerativeClustering
         model = AgglomerativeClustering(
             n_clusters=None,
             distance_threshold=0.4,
@@ -321,18 +377,43 @@ def cluster_pages_and_build_outline(headings, lines):
         headings_by_page[h['page']].append(h)
 
     for seg in page_segments:
-        seg_sizes = sorted({h['font_size'] for p in seg for h in headings_by_page.get(p, [])}, reverse=True)
-        level_map = {s: f"H{i+1}" for i, s in enumerate(seg_sizes[:3])}
-        for p in seg:
-            for h in headings_by_page.get(p, []):
-                lvl = level_map.get(h["font_size"])
-                if lvl:
-                    outline.append({
-                        "level": lvl,
-                        "text": h["text"],
-                        "page": h["page"],
-                        "score": h["score"]
-                    })
+        # collect all headings in this segment
+        seg_heads = [h for p in seg for h in headings_by_page.get(p, [])]
+        # attach underline flag
+        for h in seg_heads:
+            h["_underlined"] = int((h["page"], h["y0"]) in underlined)
+
+        # sort by font_size, bold, then underline as tiebreak
+        seg_heads.sort(key=lambda h: (
+            h["font_size"],
+            int(h.get("is_bold", 0)),
+            h["_underlined"]
+        ), reverse=True)
+
+        # pick distinct (font_size, bold) groups in that order
+        seen = set()
+        top_groups = []
+        for h in seg_heads:
+            grp = (h["font_size"], int(h.get("is_bold",0)), h["_underlined"])
+            if grp not in seen:
+                seen.add(grp)
+                top_groups.append(grp)
+            if len(top_groups) == 3:
+                break
+
+        # map the top 3 groups to H1,H2,H3
+        level_map = {grp: f"H{i+1}" for i, grp in enumerate(top_groups)}
+
+        # emit
+        for h in seg_heads:
+            group = (h["font_size"], int(h["is_bold"]), h["_underlined"])
+            lvl = level_map.get(group, "H3")
+            outline.append({
+                "level": lvl,
+                "text": h["text"],
+                "page": h["page"],
+                "score": h.get("score")
+            })
                   
     return outline
 
@@ -348,7 +429,6 @@ def find_first_content_page(all_lines, min_words=1):
             return page
     return 1  # fallback if no good page is found
 
-
 # --- Final Output ---
 def get_final_outline(pdf_path):
     pdf = fitz.open(pdf_path)
@@ -356,11 +436,16 @@ def get_final_outline(pdf_path):
     pdf.close()
     page_offset = 1 if page_count > 1 else 0
 
-    all_lines = extract_and_group_lines(pdf_path)
+    all_lines_before_merge = extract_and_group_lines(pdf_path)
+    underlined = detect_underlined_lines(pdf_path, all_lines_before_merge)
+    all_lines = merge_lines_with_underline(all_lines_before_merge, underlined)
 
     # Detect Title
     first_text_page = find_first_content_page(all_lines)
     page1_lines = [l for l in all_lines if l["page"] == first_text_page and not l["in_table"]]
+    with open('output.txt', 'w', encoding='utf-8') as fout:            # DEBUGGING
+        for line in page1_lines:
+            fout.write(line['text'] + '\n')
     title = ""
     if page1_lines:
         # title is line with greatest font size. if tie, then upper line
@@ -369,7 +454,7 @@ def get_final_outline(pdf_path):
             title = best_fit_for_title["text"]
 
     headings = classify_heading_candidates(all_lines)
-    outline = cluster_pages_and_build_outline(headings, all_lines)
+    outline = cluster_pages_and_build_outline(headings, all_lines, underlined)
 
     # Filter title out
     filtered = [o for o in outline if _clean_text(o["text"]) != _clean_text(title)]
